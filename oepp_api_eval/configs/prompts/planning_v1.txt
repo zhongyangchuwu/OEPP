@@ -1,0 +1,18 @@
+You are performing procedure planning from instructional-video observations.
+
+The images labelled START show the initial state. The images labelled GOAL show the desired final state.
+
+Select exactly {T} actions from the candidate action list and arrange them in the order required to transform START into GOAL.
+
+Rules:
+1. Select actions only from the provided candidate list.
+2. Output exactly {T} integer action IDs.
+3. Repeated IDs are allowed only when necessary.
+4. Do not add actions that are not in the list.
+5. Return JSON only, without explanations.
+
+Candidate actions:
+{candidate_action_list}
+
+Required output:
+{{"actions": [id1, id2, ..., idT]}}

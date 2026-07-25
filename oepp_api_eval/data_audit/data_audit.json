@@ -1,0 +1,287 @@
+{
+  "action_pool_overlap": {
+    "base_novel_overlap": 16,
+    "base_novel_union": 161
+  },
+  "action_pools": {
+    "base": {
+      "duplicate_entries": 0,
+      "entries": 122,
+      "file": "base_action_pool_1.json",
+      "unique_entries": 122
+    },
+    "novel": {
+      "duplicate_entries": 0,
+      "entries": 55,
+      "file": "novel_action_pool_1.json",
+      "unique_entries": 55
+    },
+    "total": {
+      "duplicate_entries": 0,
+      "entries": 161,
+      "file": "total_action_pool.json",
+      "unique_entries": 161
+    }
+  },
+  "data_root": "/home/han/research/OEPP/data",
+  "files": [
+    {
+      "bytes": 3072,
+      "path": "base_action_pool_1.json"
+    },
+    {
+      "bytes": 1424,
+      "path": "novel_action_pool_1.json"
+    },
+    {
+      "bytes": 308846,
+      "path": "novel_dataset_1.json"
+    },
+    {
+      "bytes": 1651206,
+      "path": "s3d_action_feat_dict.json"
+    },
+    {
+      "bytes": 14427,
+      "path": "task_info.json"
+    },
+    {
+      "bytes": 177230,
+      "path": "test_base_dataset_1.json"
+    },
+    {
+      "bytes": 4168,
+      "path": "total_action_pool.json"
+    },
+    {
+      "bytes": 547660,
+      "path": "train_train_base_dataset_1.json"
+    },
+    {
+      "bytes": 140806,
+      "path": "train_val_base_dataset_1.json"
+    },
+    {
+      "bytes": 2661413,
+      "path": "vc_action_feat_dict.json"
+    }
+  ],
+  "generated_at": "2026-07-22T10:50:52+00:00",
+  "splits": {
+    "base": {
+      "action_fields": [
+        "action",
+        "segment"
+      ],
+      "dataset_vid_duplicates": {},
+      "declared_length_distribution": {
+        "1": 2,
+        "2": 78,
+        "3": 86,
+        "4": 88,
+        "5": 61,
+        "6": 44,
+        "7": 17,
+        "8": 10,
+        "9": 10,
+        "10": 5,
+        "11": 3,
+        "12": 2,
+        "13": 2,
+        "14": 3,
+        "16": 2,
+        "17": 2,
+        "21": 1
+      },
+      "declared_length_mismatches": [],
+      "domains": 8,
+      "events": 29,
+      "file": "test_base_dataset_1.json",
+      "ground_truth_actions_missing_from_protocol_pool": [],
+      "paper_table_ii_match": {
+        "segments": true,
+        "videos": true
+      },
+      "raw_vid_duplicates": {},
+      "record_fields": [
+        "anno",
+        "dataset",
+        "domain",
+        "length",
+        "task_id",
+        "task_id_old",
+        "task_name",
+        "vid"
+      ],
+      "segments": 1888,
+      "sequence_windows": {
+        "T3": 1058,
+        "T4": 722
+      },
+      "videos": 416
+    },
+    "novel": {
+      "action_fields": [
+        "action",
+        "segment"
+      ],
+      "dataset_vid_duplicates": {},
+      "declared_length_distribution": {
+        "2": 147,
+        "3": 192,
+        "4": 174,
+        "5": 79,
+        "6": 63,
+        "7": 29,
+        "8": 19,
+        "9": 14,
+        "10": 6,
+        "11": 5,
+        "12": 1,
+        "14": 2,
+        "16": 1,
+        "19": 1
+      },
+      "declared_length_mismatches": [],
+      "domains": 8,
+      "events": 14,
+      "file": "novel_dataset_1.json",
+      "ground_truth_actions_missing_from_protocol_pool": [],
+      "paper_table_ii_match": {
+        "segments": true,
+        "videos": true
+      },
+      "raw_vid_duplicates": {},
+      "record_fields": [
+        "anno",
+        "dataset",
+        "domain",
+        "length",
+        "task_id",
+        "task_id_old",
+        "task_name",
+        "vid"
+      ],
+      "segments": 3010,
+      "sequence_windows": {
+        "T3": 1544,
+        "T4": 958
+      },
+      "videos": 733
+    },
+    "train": {
+      "action_fields": [
+        "action",
+        "segment"
+      ],
+      "dataset_vid_duplicates": {},
+      "declared_length_distribution": {
+        "1": 5,
+        "2": 277,
+        "3": 271,
+        "4": 251,
+        "5": 168,
+        "6": 109,
+        "7": 61,
+        "8": 45,
+        "9": 27,
+        "10": 22,
+        "11": 12,
+        "12": 12,
+        "13": 6,
+        "15": 7,
+        "16": 4,
+        "17": 1,
+        "18": 2,
+        "20": 2,
+        "31": 1,
+        "32": 1,
+        "34": 1
+      },
+      "declared_length_mismatches": [],
+      "domains": 8,
+      "events": 29,
+      "file": "train_train_base_dataset_1.json",
+      "ground_truth_actions_missing_from_protocol_pool": [],
+      "paper_table_ii_match": {
+        "segments": true,
+        "videos": true
+      },
+      "raw_vid_duplicates": {
+        "Izsa3XvFAVs": 2
+      },
+      "record_fields": [
+        "anno",
+        "dataset",
+        "domain",
+        "length",
+        "task_id",
+        "task_id_old",
+        "task_name",
+        "vid"
+      ],
+      "segments": 5833,
+      "sequence_windows": {
+        "T3": 3268,
+        "T4": 2265
+      },
+      "videos": 1285
+    },
+    "validation": {
+      "action_fields": [
+        "action",
+        "segment"
+      ],
+      "dataset_vid_duplicates": {},
+      "declared_length_distribution": {
+        "1": 1,
+        "2": 76,
+        "3": 78,
+        "4": 65,
+        "5": 43,
+        "6": 23,
+        "7": 16,
+        "8": 9,
+        "9": 8,
+        "10": 4,
+        "11": 3,
+        "12": 1,
+        "13": 5,
+        "14": 4,
+        "17": 1
+      },
+      "declared_length_mismatches": [],
+      "domains": 8,
+      "events": 29,
+      "file": "train_val_base_dataset_1.json",
+      "ground_truth_actions_missing_from_protocol_pool": [],
+      "paper_table_ii_match": {
+        "segments": true,
+        "videos": true
+      },
+      "raw_vid_duplicates": {},
+      "record_fields": [
+        "anno",
+        "dataset",
+        "domain",
+        "length",
+        "task_id",
+        "task_id_old",
+        "task_name",
+        "vid"
+      ],
+      "segments": 1479,
+      "sequence_windows": {
+        "T3": 806,
+        "T4": 546
+      },
+      "videos": 337
+    }
+  },
+  "visual_assets": {
+    "image_or_frame_fields": [],
+    "images_under_data_root": 0,
+    "images_under_repository_root": 1,
+    "manifest_ready": false
+  }
+}
