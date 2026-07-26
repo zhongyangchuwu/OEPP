@@ -4,9 +4,8 @@ import argparse
 from pathlib import Path
 from typing import Any
 
-from PIL import Image
-
 from common import load_json, utc_now, write_jsonl
+from PIL import Image
 
 PROTOCOL_ID = "table_v_t4_3x3_legacy_v1"
 HORIZON = 4

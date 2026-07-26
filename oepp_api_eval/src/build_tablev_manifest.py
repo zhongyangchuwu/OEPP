@@ -4,10 +4,9 @@ import argparse
 from pathlib import Path
 from typing import Any
 
-from PIL import Image
-
 from common import load_json, load_jsonl, write_jsonl
 from extract_tablev_frames import HORIZON, PROTOCOL_ID
+from PIL import Image
 
 SPLIT_FILES = {
     "base": "test_base_dataset_1.json",

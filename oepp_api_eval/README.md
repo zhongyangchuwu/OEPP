@@ -19,13 +19,16 @@ No command in this project can issue an API request in that state.
 
 ## Environment
 
-Requires Python 3.10+ and [uv](https://docs.astral.sh/uv/):
+Requires Python 3.10+ and [uv](https://docs.astral.sh/uv/). The repository-root `pyproject.toml` and `uv.lock` are the only environment definition; this directory is not a nested uv project.
+
+From the repository root:
 
 ```bash
-cd oepp_api_eval
 uv sync --locked
-uv run python src/inspect_data.py --output-dir data_audit
+uv run python oepp_api_eval/src/inspect_data.py --data-root data --output-dir oepp_api_eval/data_audit
 ```
+
+The commands below enter `oepp_api_eval/` for relative data paths. uv discovers the root project, uses its root `.venv/`, and does not create a nested environment.
 
 Create an ignored `.env` from `.env.example`. The active SiliconFlow Qwen3-VL configuration reads the key only from the shell and stores endpoint/model selection separately:
 

@@ -1,0 +1,57 @@
+[project]
+name = "oepp"
+version = "0.1.0"
+description = "Open-Event Procedure Planning baselines and API evaluation"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "einops==0.8.0",
+    "httpx[socks]>=0.27,<1",
+    "matplotlib==3.8.3",
+    "numpy>=1.26,<2",
+    "opencv-python-headless>=4.10,<5",
+    "openai>=1,<3",
+    "Pillow>=10,<12",
+    "python-dotenv>=1,<2",
+    "PyYAML>=6,<7",
+    "tensorboardX==2.6.2.2",
+]
+
+[project.optional-dependencies]
+cpu = ["torch==2.3.0"]
+cu118 = ["torch==2.3.0+cu118"]
+
+[dependency-groups]
+dev = ["ruff>=0.5,<1"]
+
+[tool.uv]
+package = false
+conflicts = [
+    [
+        { extra = "cpu" },
+        { extra = "cu118" },
+    ],
+]
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cpu", extra = "cpu" },
+    { index = "pytorch-cu118", extra = "cu118" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu118"
+url = "https://download.pytorch.org/whl/cu118"
+explicit = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]

@@ -23,23 +23,27 @@ Our data splits and annotations are under `data`.
 | **File**                             | **Description**    |
 |--------------------------------------|--------------------|
 | data/train_train_base_dataset_1.json | train dataset      |
-| data/train_train_val_dataset_1.json  | val dataset        |
+| data/train_val_base_dataset_1.json   | validation dataset |
 | data/novel_dataset_1.json            | test novel dataset |
 | data/test_base_dataset_1.json        | test base dataset  |
 | data/base_action_pool_1.json         | base action pool   |
 | data/novel_action_pool_1.json        | novel action pool  |
-| data/total_action_pool_1.json        | total action pool  |
+| data/total_action_pool.json          | total action pool  |
 | data/task_info.json                  | event info         |
 
-## Install Dependecny
+## Environment
 
-`conda create --name oepp python=3.9`
+The repository is managed from this root by [uv](https://docs.astral.sh/uv/) and requires Python 3.10+. `pyproject.toml` and the committed `uv.lock` replace the legacy Conda/pip environment and `requirements.txt`.
 
-`conda activate oepp`
+```bash
+# NVIDIA CUDA 11.8 server (training and export)
+uv sync --locked --extra cu118
 
-`pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118`
+# CPU-only inspection, API evaluation, and non-GPU tests
+uv sync --locked --extra cpu
+```
 
-`pip install -r requirements.txt`
+Use `uv run ...` for every repository command. The two PyTorch extras are mutually exclusive; select `cu118` for the experiment server.
 
 ## Download features
 
@@ -53,13 +57,13 @@ Note that our videoclip features are currently only available for OEPP. We will 
 ### MLP-based 
 You can run the code using the following command, and the results will be in `results/MLP`.
 
-`python train.py --config=MLP_config.yaml`
+`uv run python train.py --config=MLP_config.yaml`
 
 ### Transformer-based 
 
 You can run the code using the following command, and the results will be in `results/attention`.
 
-`python train.py --config=attention_config.yaml`
+`uv run python train.py --config=attention_config.yaml`
 
 ### PDPP legacy path
 
@@ -69,36 +73,36 @@ The original PDPP command below is retained in Git history only; it can resume a
 
 The legacy `train.py` and `eval.py` remain available for reproducing their original discrete metrics. For embedding analysis, train from fresh initialization with the state-dict checkpoint runner; it supports both the MLP and Transformer OEPP baselines and never selects on Base or Novel test metrics.
 
-Run this before calibration or training. It verifies every annotation/action against its split pool, all expected feature file paths, action embeddings, and CUDA/Torch; it exits nonzero on any failure.
+Run this after `uv sync --locked --extra cu118`. It verifies every annotation/action against its split pool, all expected feature file paths, action embeddings, and CUDA/Torch; it exits nonzero on any failure.
 
 ```bash
-python embedding_preflight.py \
+uv run python embedding_preflight.py \
   --feature videoclip \
   --verify-feature-content \
   --output results/experiment4/preflight_videoclip.json
-python -m unittest discover -s tests -v
+uv run python -m unittest discover -s tests -v
 ```
 Server acceptance criteria: preflight exits 0; unit tests pass; each direct run writes `last.pt`, `best.pt`, and `selection.json`; direct export writes Base `(1138, 3, 768)` and Novel `(1691, 3, 768)` raw tensors, 3,414 / 5,073 CSV step rows, `summary_metrics.json`, and all seven named figures. PDPP must meet the same export shape/count checks in its own output directory using the documented `--sampling_seed`.
 
 ```bash
 # Timing calibration only: a separate 10-epoch fresh run.
-CUDA_VISIBLE_DEVICES=0 python train_embeddings.py \
+CUDA_VISIBLE_DEVICES=0 uv run python train_embeddings.py \
   --config attention_config.yaml \
   --epochs 10 \
   --run-dir results/experiment4/attention_t3_seed42_calibration
 
 # Fresh 200-epoch Transformer run.
-CUDA_VISIBLE_DEVICES=0 python train_embeddings.py \
+CUDA_VISIBLE_DEVICES=0 uv run python train_embeddings.py \
   --config attention_config.yaml \
   --run-dir results/experiment4/attention_t3_seed42
 
 # Fresh 200-epoch MLP comparator.
-CUDA_VISIBLE_DEVICES=0 python train_embeddings.py \
+CUDA_VISIBLE_DEVICES=0 uv run python train_embeddings.py \
   --config MLP_config.yaml \
   --run-dir results/experiment4/mlp_t3_seed42
 
 # Export Base/Novel continuous embeddings and all pre-specified figures.
-CUDA_VISIBLE_DEVICES=0 python export_embeddings.py \
+CUDA_VISIBLE_DEVICES=0 uv run python export_embeddings.py \
   --checkpoint results/experiment4/attention_t3_seed42/best.pt \
   --output-dir embedding_results/attention_t3_seed42
 ```
@@ -106,7 +110,7 @@ CUDA_VISIBLE_DEVICES=0 python export_embeddings.py \
 PDPP is a separate stochastic model and must use a separate run/result directory. It now saves fresh `last.pt` and validation-selected `best.pt`; do not pass `--resume` for a new run and do not pass `--test_during_training`.
 
 ```bash
-CUDA_VISIBLE_DEVICES=0 python pdpp_train.py \
+CUDA_VISIBLE_DEVICES=0 uv run python pdpp_train.py \
   --gpu 0 \
   --checkpoint_root results/experiment4/pdpp_checkpoints \
   --checkpoint_dir pdpp_t3_seed217 \
@@ -116,7 +120,7 @@ CUDA_VISIBLE_DEVICES=0 python pdpp_train.py \
   --batch_size 32 --batch_size_val 32 --epochs 200 \
   --num_thread_reader 4 --pin_memory --evaluate --sampling_seed 42
 
-CUDA_VISIBLE_DEVICES=0 python export_pdpp_embeddings.py \
+CUDA_VISIBLE_DEVICES=0 uv run python export_pdpp_embeddings.py \
   --checkpoint results/experiment4/pdpp_checkpoints/pdpp_t3_seed217/best.pt \
   --output-dir embedding_results/pdpp_t3_seed217 \
   --sampling_seed 42

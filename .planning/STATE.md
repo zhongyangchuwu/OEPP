@@ -19,14 +19,14 @@ See: `.planning/PROJECT.md` (updated 2026-07-22)
 
 Phase: Experiment 4 embedding-analysis implementation  
 Status: Fresh MLP, Transformer, and PDPP checkpoint/export paths are implemented locally. The models share unchanged OEPP annotations/features and a standard embedding artifact schema, but each run remains separate. Runtime validation and server execution are blocked on server access, CUDA/Torch, and `/data0` feature availability.  
-Last activity: 2026-07-26 — added fresh direct-model trainer/exporter, PDPP state-dict lifecycle and seeded exporter, stable dataset metadata, plotting dependency, and server commands.
+Last activity: 2026-07-26 — added fresh direct-model trainer/exporter, PDPP state-dict lifecycle and seeded exporter, stable dataset metadata, plotting dependency, server commands, and one root uv project with CPU/CUDA extras.
 
 ## Accumulated Context
 
 ### Decisions
 
-- Create the separate `oepp_api_eval/` workspace; do not change the original OEPP source/data paths.
-- Use `uv` and its committed `uv.lock`; do not create or use a Conda environment.
+- Keep `oepp_api_eval/` as a source/data subdirectory while retaining the OEPP root as the sole project boundary.
+- Use the root `pyproject.toml` and committed root `uv.lock`; do not use Conda, `requirements.txt`, or a nested uv project/environment.
 - Treat image availability as a hard manifest prerequisite. Current annotation JSON contains action segments and timestamps, but no raw image paths.
 - Preserve source action semantics, raw action-pool text, and split-pool order; normalize case/whitespace only when matching action names for parsing and scoring.
 - Preserve invalid model outputs as evaluation failures; no semantic repair.
