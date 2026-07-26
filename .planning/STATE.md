@@ -17,9 +17,9 @@ See: `.planning/PROJECT.md` (updated 2026-07-22)
 
 ## Current Position
 
-Phase: Experiment 4 embedding-analysis execution complete; scientific interpretation and optional local artifact retrieval remain.
-Status: Server preflight, fresh 200-epoch MLP/Transformer/PDPP runs, validation-selected checkpoints, Base/Novel exports, all pre-specified figures, and seeded PDPP repeat-export verification are complete. Canonical artifacts remain on the server because WSL rsync transfer was deferred after a stalled partial download.
-Last activity: 2026-07-26 — audited all three final server-side model artifacts. PDPP selected epoch 168 of 200 by validation SR/Acc; repeat export with seed 42 produced equal Base/Novel raw tensors.
+Phase: Experiment 4 embedding-analysis execution complete; OpenRouter Gemini 3 Flash Preview Table V full evaluation is running sequentially.
+Status: The three final Experiment 4 exports are now local under `embedding_results/`; their six raw NPZ SHA-256 values match the server, every artifact contract passes, and the PDPP fixed-seed repeat is elementwise equal. The persistent Gemini process completed its 855-sample Base phase and remains running for the sequential Novel phase; full Gemini metrics remain pending its completion and audit.
+Last activity: 2026-07-26 — created `.planning/STATUS-BRIEF-20260726.md` for the 8 PM report, verified local final tensors against the server, and captured the nonblocking Gemini run status.
 
 ## Accumulated Context
 
