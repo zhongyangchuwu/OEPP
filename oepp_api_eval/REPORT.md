@@ -382,3 +382,9 @@ embedding_results/
 - **停止条件：** 403 为非 retryable provider-availability failure，未重复发送，也没有启动 Novel pilot。该结果仅证明当前 key/region 无法访问这个模型，不能解释为模型质量、视觉能力或格式能力。保持 model ID 不变，等待区域可用性恢复或用户明确选择并批准另一个 account-visible Gemini text-and-image model；不得自动 fallback。
 
 外部接口依据：[OpenRouter API reference](https://openrouter.ai/docs/api-reference/overview)、[OpenRouter models API](https://openrouter.ai/api/v1/models)。
+
+### 14.1 Gemini 3 Flash Preview smoke test
+
+- **模型检索：** 同一 OpenRouter inventory 返回 `google/gemini-3-flash-preview`，其 metadata 声明 `text+image+file+audio+video->text` 并支持 `temperature`、`max_tokens`、`seed` 与 structured outputs；因此它满足 Table V 的输入/输出模态要求。
+- **实际调用：** `2026-07-26T10:08:47+00:00` 对同一 Base observation 以六张已 hash JPEG、`temperature=0`、`max_tokens=512`、无 retry 发出一条请求。它同样返回 HTTP 403 `This model is not available in your region.`，延迟 1.264 s，没有 completion、usage、action prediction 或可报告指标。
+- **结论：** 当前环境的 OpenRouter key/region 无法访问两个经测试的 Google Gemini text-and-image models：`google/gemini-3.1-flash-lite` 与 `google/gemini-3-flash-preview`。这不是模型或 parser 的失败；不要继续枚举模型消耗配额，等待用户明确下一 provider/model 决策。
