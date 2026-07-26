@@ -113,6 +113,7 @@ class Seq_action(torch.utils.data.Dataset):
         self.is_total = is_total
         self.is_val = is_val
         self.videos = Video(root=self.root, split=self.split, feat= self.feat,is_val=self.is_val)
+        self.partition = {0: 'train', 1: 'novel', 2: 'base', 3: 'validation'}[self.is_val]
         self.seq_list = []
         print("len of videos: ", len(self.videos))
         if self.feat == 'videoclip':
@@ -122,46 +123,68 @@ class Seq_action(torch.utils.data.Dataset):
             with open('data/s3d_action_feat_dict.json') as f:
                 self.actions_text_dict = json.load(f)
 
-        for video in self.videos:
-            vid, start_frames_list, end_frames_list , action_list = video
+        for source_video_index, video in enumerate(self.videos):
+            source_video = self.videos.json_data[source_video_index]
+            vid, start_frames_list, end_frames_list, action_list = video
             length = len(action_list)
-            # print(length)
             if self.T <= length:
-                for i in range(length-self.T+1):
-                    # print(i)
-                    start_id = i
-                    end_id = i + self.T - 1
-                    start_f = start_frames_list[start_id]
-                    end_f = end_frames_list[end_id]
-                    actions = action_list[start_id:end_id+1]
-                    self.seq_list.append({'vid':vid, 'start_frames':start_f,'end_frames':end_f,'actions':actions})
-            else:
-                if self.is_pad == 1:
-                    start_f = start_frames_list[0]
-                    end_f = end_frames_list[-1]
-                    pad_action_list = []
-                    for i in range(self.T-length):
-                        pad_action_list.append(action_list[0])
-                    actions = pad_action_list+action_list
-                    self.seq_list.append({'vid':vid, 'start_frames': start_f, 'end_frames': end_f, 'actions': actions})
+                for start_id in range(length - self.T + 1):
+                    end_id = start_id + self.T - 1
+                    actions = list(action_list[start_id:end_id + 1])
+                    self.seq_list.append({
+                        'sample_id': f'split{self.split}_{self.partition}_video{source_video_index}_start{start_id}_T{self.T}',
+                        'vid': vid,
+                        'dataset': source_video.get('dataset', ''),
+                        'task_name': source_video.get('task_name', ''),
+                        'task_id': source_video.get('task_id', ''),
+                        'task_id_old': source_video.get('task_id_old', ''),
+                        'source_video_index': source_video_index,
+                        'start_step': start_id,
+                        'end_step': end_id,
+                        'is_padded': False,
+                        'pad_count': 0,
+                        'start_frames': start_frames_list[start_id],
+                        'end_frames': end_frames_list[end_id],
+                        'actions': actions,
+                    })
+            elif self.is_pad == 1:
+                pad_count = self.T - length
+                actions = [action_list[0]] * pad_count + list(action_list)
+                self.seq_list.append({
+                    'sample_id': f'split{self.split}_{self.partition}_video{source_video_index}_padded_T{self.T}',
+                    'vid': vid,
+                    'dataset': source_video.get('dataset', ''),
+                    'task_name': source_video.get('task_name', ''),
+                    'task_id': source_video.get('task_id', ''),
+                    'task_id_old': source_video.get('task_id_old', ''),
+                    'source_video_index': source_video_index,
+                    'start_step': 0,
+                    'end_step': length - 1,
+                    'is_padded': True,
+                    'pad_count': pad_count,
+                    'start_frames': start_frames_list[0],
+                    'end_frames': end_frames_list[-1],
+                    'actions': actions,
+                })
         print("total sequences length:",len(self.seq_list))
-
-    def get_labels(self,actions):
-        if self.is_val == 0 or self.is_val == 2 or self.is_val == 3:  # 训练集和验证集是train_action_pool
-            with open('data/base_action_pool_' + str(self.split) + '.json') as f:
-                self.action_pool = json.load(f)
+        if self.is_val == 0 or self.is_val == 2 or self.is_val == 3:
+            action_pool_file = 'data/base_action_pool_' + str(self.split) + '.json'
         else:
-            with open('data/novel_action_pool_' + str(self.split) + '.json') as f:
-                self.action_pool = json.load(f)
+            action_pool_file = 'data/novel_action_pool_' + str(self.split) + '.json'
         if self.is_total == 1:
-            with open('data/total_action_pool.json') as f:
-                self.action_pool = json.load(f)
-        l = torch.zeros(self.T,dtype=int)
-        for index in range(len(actions)):
-            for i in range(len(self.action_pool)):
-                if actions[index] == self.action_pool[i]:
-                    l[index] = torch.tensor(i)
-        return l
+            action_pool_file = 'data/total_action_pool.json'
+        with open(action_pool_file) as f:
+            self.action_pool = json.load(f)
+        self.action_to_label = {action: index for index, action in enumerate(self.action_pool)}
+
+    def get_labels(self, actions):
+        labels = torch.empty(self.T, dtype=torch.long)
+        for index, action in enumerate(actions):
+            try:
+                labels[index] = self.action_to_label[action]
+            except KeyError as error:
+                raise ValueError(f'Action {action!r} is absent from the selected action pool') from error
+        return labels
     def get_action_tensor(self,action_list):
         tensor_list = []
         for action in action_list:
@@ -171,6 +194,23 @@ class Seq_action(torch.utils.data.Dataset):
         return text_tensor
     def __len__(self):
         return len(self.seq_list)
+    def metadata_at(self, index):
+        seq = self.seq_list[index]
+        return {
+            'sample_id': seq['sample_id'],
+            'split': self.partition,
+            'dataset': seq['dataset'],
+            'task_name': seq['task_name'],
+            'task_id': seq['task_id'],
+            'task_id_old': seq['task_id_old'],
+            'vid': seq['vid'],
+            'source_video_index': seq['source_video_index'],
+            'start_step': seq['start_step'],
+            'end_step': seq['end_step'],
+            'is_padded': seq['is_padded'],
+            'pad_count': seq['pad_count'],
+            'actions': list(seq['actions']),
+        }
     def __getitem__(self, index):
         seq = self.seq_list[index]
         vid = seq['vid']

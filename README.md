@@ -61,8 +61,65 @@ You can run the code using the following command, and the results will be in `re
 
 `python train.py --config=attention_config.yaml`
 
-### PDPP*
+### PDPP legacy path
 
-You can run the code using the following command, and the results will be in `log`. You can use TensorBoard to view the results.
+The original PDPP command below is retained in Git history only; it can resume a placeholder directory and previously evaluated test sets during training. Use the fresh Experiment 4 PDPP command below instead, which creates state-dict checkpoints and reserves Base/Novel evaluation for the exporter.
 
-`CUDA_VISIBLE_DEVICES=0 python pdpp_train.py --multiprocessing-distributed --num_thread_reader=1 --cudnn_benchmark=1 --pin_memory --checkpoint_dir=whl --resume --dist-url='tcp://localhost:21723' --horizon=3 --feat='videoclip' --split=1 --para_mse=0.2 --para_ce=1.0 --lr=0.0005 --batch_size=32 --batch_size_val=32 --evaluate`
+## Experiment 4: fresh embedding analysis
+
+The legacy `train.py` and `eval.py` remain available for reproducing their original discrete metrics. For embedding analysis, train from fresh initialization with the state-dict checkpoint runner; it supports both the MLP and Transformer OEPP baselines and never selects on Base or Novel test metrics.
+
+Run this before calibration or training. It verifies every annotation/action against its split pool, all expected feature file paths, action embeddings, and CUDA/Torch; it exits nonzero on any failure.
+
+```bash
+python embedding_preflight.py \
+  --feature videoclip \
+  --verify-feature-content \
+  --output results/experiment4/preflight_videoclip.json
+python -m unittest discover -s tests -v
+```
+Server acceptance criteria: preflight exits 0; unit tests pass; each direct run writes `last.pt`, `best.pt`, and `selection.json`; direct export writes Base `(1138, 3, 768)` and Novel `(1691, 3, 768)` raw tensors, 3,414 / 5,073 CSV step rows, `summary_metrics.json`, and all seven named figures. PDPP must meet the same export shape/count checks in its own output directory using the documented `--sampling_seed`.
+
+```bash
+# Timing calibration only: a separate 10-epoch fresh run.
+CUDA_VISIBLE_DEVICES=0 python train_embeddings.py \
+  --config attention_config.yaml \
+  --epochs 10 \
+  --run-dir results/experiment4/attention_t3_seed42_calibration
+
+# Fresh 200-epoch Transformer run.
+CUDA_VISIBLE_DEVICES=0 python train_embeddings.py \
+  --config attention_config.yaml \
+  --run-dir results/experiment4/attention_t3_seed42
+
+# Fresh 200-epoch MLP comparator.
+CUDA_VISIBLE_DEVICES=0 python train_embeddings.py \
+  --config MLP_config.yaml \
+  --run-dir results/experiment4/mlp_t3_seed42
+
+# Export Base/Novel continuous embeddings and all pre-specified figures.
+CUDA_VISIBLE_DEVICES=0 python export_embeddings.py \
+  --checkpoint results/experiment4/attention_t3_seed42/best.pt \
+  --output-dir embedding_results/attention_t3_seed42
+```
+
+PDPP is a separate stochastic model and must use a separate run/result directory. It now saves fresh `last.pt` and validation-selected `best.pt`; do not pass `--resume` for a new run and do not pass `--test_during_training`.
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python pdpp_train.py \
+  --gpu 0 \
+  --checkpoint_root results/experiment4/pdpp_checkpoints \
+  --checkpoint_dir pdpp_t3_seed217 \
+  --log_root results/experiment4/pdpp_logs \
+  --horizon 3 --feat videoclip --split 1 --is_pad 1 \
+  --para_mse 0.2 --para_ce 1.0 --lr 0.0005 \
+  --batch_size 32 --batch_size_val 32 --epochs 200 \
+  --num_thread_reader 4 --pin_memory --evaluate --sampling_seed 42
+
+CUDA_VISIBLE_DEVICES=0 python export_pdpp_embeddings.py \
+  --checkpoint results/experiment4/pdpp_checkpoints/pdpp_t3_seed217/best.pt \
+  --output-dir embedding_results/pdpp_t3_seed217 \
+  --sampling_seed 42
+```
+
+Before a server run, verify CUDA/Torch, write access, the four annotation JSON files, and `/data0/wuyilu/data/OEPP_videoclip`. No dataset conversion is required: `Seq_action` reads the original annotations and precomputed feature files. The embedding path records stable source-window metadata and rejects an action absent from its selected pool. `matplotlib==3.8.3` is required for the figures.

@@ -1,4 +1,3 @@
-import glob
 import os
 import random
 from collections import OrderedDict
@@ -15,17 +14,18 @@ from torch.distributed import ReduceOp
 from dataset.dataset import Seq_action
 
 import utils
-from model import diffusion, temporal
+from embedding_support import annotation_hashes, write_json
 from model.helpers import get_lr_schedule_with_warmup
-
+from pdpp_runtime import build_pdpp_diffusion, checkpoint_payload, load_pdpp_checkpoint, save_pdpp_checkpoint, unwrap_model
 from utils import *
-from logging import log
 from utils.args import get_args
 import numpy as np
 from model.helpers import Logger
 
 
 def reduce_tensor(tensor):
+    if not dist.is_available() or not dist.is_initialized():
+        return tensor
     rt = tensor.clone()
     torch.distributed.all_reduce(rt, op=ReduceOp.SUM)
     rt /= dist.get_world_size()
@@ -54,6 +54,8 @@ def main():
         np.random.seed(args.seed)
         torch.manual_seed(args.seed)
         torch.cuda.manual_seed_all(args.seed)
+        cudnn.deterministic = True
+        cudnn.benchmark = False
 
     args.distributed = args.world_size > 1 or args.multiprocessing_distributed
     ngpus_per_node = torch.cuda.device_count()
@@ -177,16 +179,7 @@ def main_worker(gpu, ngpus_per_node, args):
     )
 
     # create model
-    temporal_model = temporal.TemporalUnet(
-        args,
-        args.action_dim + args.observation_dim + args.class_dim + args.horizon_dim,
-        dim=256,
-        dim_mults=(1, 2, 4), )
-
-    diffusion_model = diffusion.GaussianDiffusion(
-        temporal_model, args.horizon, args.observation_dim, args.action_dim, args.horizon_dim, args.class_dim,
-        args.n_diffusion_steps,
-        loss_type='Weighted_MSE', clip_denoised=True, )
+    diffusion_model = build_pdpp_diffusion(args)
 
     model = utils.Trainer(diffusion_model, train_loader, None, None, None, args.ema_decay, args.lr,
                           args.gradient_accumulate_every,
@@ -220,40 +213,40 @@ def main_worker(gpu, ngpus_per_node, args):
 
     scheduler = get_lr_schedule_with_warmup(model.optimizer, int(args.n_train_steps * args.epochs))
 
-    checkpoint_dir = os.path.join(os.path.dirname(__file__), 'checkpoint', args.checkpoint_dir)
-    if args.checkpoint_dir != '' and not (os.path.isdir(checkpoint_dir)) and args.rank == 0:
-        os.mkdir(checkpoint_dir)
-
+    if not args.checkpoint_dir:
+        raise ValueError('--checkpoint_dir is required for a fresh, reproducible PDPP run')
+    checkpoint_dir = os.path.join(args.checkpoint_root, args.checkpoint_dir)
+    if args.rank == 0:
+        os.makedirs(checkpoint_dir, exist_ok=True)
+    tb_logdir = os.path.join(args.log_root, args.checkpoint_dir)
+    if args.rank == 0:
+        os.makedirs(tb_logdir, exist_ok=True)
+        tb_logger = Logger(tb_logdir)
+        tb_logger.log_info(args)
+        write_json(
+            os.path.join(checkpoint_dir, 'run_metadata.json'),
+            {
+                'fresh_initialization': not args.resume,
+                'args': vars(args).copy(),
+                'annotation_hashes': annotation_hashes('data', args.split, args.feat),
+            },
+        )
     if args.resume:
-        checkpoint_path = get_last_checkpoint(checkpoint_dir)
-        if checkpoint_path:
-            log("=> loading checkpoint '{}'".format(checkpoint_path), args)
-            checkpoint = torch.load(checkpoint_path, map_location='cpu')
-            args.start_epoch = checkpoint["epoch"]
-            model.model.load_state_dict(checkpoint["model"])
-            model.ema_model.load_state_dict(checkpoint["ema"])
-            model.optimizer.load_state_dict(checkpoint["optimizer"])
-            model.step = checkpoint["step"]
-            scheduler.load_state_dict(checkpoint["scheduler"])
-            tb_logdir = checkpoint["tb_logdir"]
-            if args.rank == 0:
-                # creat logger
-                tb_logger = Logger(tb_logdir)
-                log("=> loaded checkpoint '{}' (epoch {}){}".format(checkpoint_path, checkpoint["epoch"], args.gpu),
-                    args)
-        else:
-            logname = args.log_root + '_T=' + str(args.horizon) + '_split=' + str(args.split) + '_feat=' + args.feat + '_lr=' + str(args.lr) + '_para_mse=' + str(args.para_mse) + '_para_ce=' + str(args.para_ce)
-            tb_logdir = os.path.join(args.log_root, logname)
-            if args.rank == 0:
-                # creat logger
-                if not (os.path.exists(tb_logdir)):
-                    os.makedirs(tb_logdir)
-                tb_logger = Logger(tb_logdir)
-                tb_logger.log_info(args)
-            log("=> no checkpoint found at '{}'".format(args.resume), args)
+        checkpoint_path = os.path.join(checkpoint_dir, 'last.pt')
+        if not os.path.isfile(checkpoint_path):
+            raise FileNotFoundError(f'--resume requested but {checkpoint_path} does not exist')
+        checkpoint = load_pdpp_checkpoint(checkpoint_path, torch.device('cpu'))
+        args.start_epoch = checkpoint['epoch']
+        unwrap_model(model.model).load_state_dict(checkpoint['model'])
+        unwrap_model(model.ema_model).load_state_dict(checkpoint['ema'])
+        model.optimizer.load_state_dict(checkpoint['optimizer'])
+        model.step = checkpoint['step']
+        scheduler.load_state_dict(checkpoint['scheduler'])
+        if args.rank == 0:
+            log(f"=> resumed checkpoint '{checkpoint_path}' at epoch {checkpoint['epoch']}", args)
 
     if args.cudnn_benchmark:
-        cudnn.benchmark = True
+        raise ValueError('cudnn_benchmark is incompatible with reproducible Experiment 4 PDPP runs')
     total_batch_size = args.world_size * args.batch_size
     log(
         "Starting training loop for rank: {}, total batch size: {}".format(
@@ -261,8 +254,8 @@ def main_worker(gpu, ngpus_per_node, args):
         ), args
     )
 
-    max_eva = 0
-    max_acc = 0
+    max_eva = -1
+    max_acc = -1
     # old_max_epoch = 0
     # save_max = os.path.join(os.path.dirname(__file__), 'save_max')
 
@@ -320,7 +313,10 @@ def main_worker(gpu, ngpus_per_node, args):
 
                 tb_logger.flush()
 
+        validation_metrics = {}
         if ((epoch + 1) % 1 == 0) and args.evaluate:  # or epoch >= 10
+            torch.manual_seed(args.sampling_seed)
+            torch.cuda.manual_seed_all(args.sampling_seed)
             acc_top1_reduced1 = 0.
             acc_top5_reduced1 = 0.
             trajectory_success_rate_meter_reduced1 = 0.
@@ -366,29 +362,35 @@ def main_worker(gpu, ngpus_per_node, args):
                 tb_logger.flush()
             trajectory_success_rate_meter_reduced = trajectory_success_rate_meter_reduced1
             acc_top1_reduced = acc_top1_reduced1
+            validation_metrics = {
+                'sr': trajectory_success_rate_meter_reduced,
+                'acc': acc_top1_reduced,
+                'acc_top5': acc_top5_reduced1,
+                'miou1': MIoU1_meter_reduced1,
+                'miou2': MIoU2_meter_reduced1,
+            }
             print(trajectory_success_rate_meter_reduced, acc_top1_reduced)
-            if trajectory_success_rate_meter_reduced >= max_eva:
-                if not (trajectory_success_rate_meter_reduced == max_eva and acc_top1_reduced < max_acc):
-                    if args.rank == 0:
-                    #     save_checkpoint2(
-                    #         {
-                    #             "epoch": epoch + 1,
-                    #             "model": model.model.state_dict(),
-                    #             "ema": model.ema_model.state_dict(),
-                    #             # "os": model.os_embed.state_dict(),
-                    #             # "og": model.og_embed.state_dict(),
-                    #             "optimizer": model.optimizer.state_dict(),
-                    #             "step": model.step,
-                    #             "tb_logdir": tb_logdir,
-                    #             "scheduler": scheduler.state_dict(),
-                    #         }, save_max, old_max_epoch, epoch + 1, args.rank
-                    #     )
-                        print('max:', 'sr:', trajectory_success_rate_meter_reduced)
-                    max_eva = trajectory_success_rate_meter_reduced
-                    max_acc = acc_top1_reduced
-                    old_max_epoch = epoch + 1
+            is_best = (trajectory_success_rate_meter_reduced, acc_top1_reduced) > (max_eva, max_acc)
+            if is_best:
+                max_eva = trajectory_success_rate_meter_reduced
+                max_acc = acc_top1_reduced
+        if args.rank == 0:
+            payload = checkpoint_payload(
+                epoch=epoch + 1,
+                model=model.model,
+                ema_model=model.ema_model,
+                optimizer=model.optimizer,
+                scheduler=scheduler,
+                step=model.step,
+                args=args,
+                validation_metrics=validation_metrics,
+                tb_logdir=tb_logdir,
+            )
+            save_pdpp_checkpoint(os.path.join(checkpoint_dir, 'last.pt'), payload)
+            if validation_metrics and is_best:
+                save_pdpp_checkpoint(os.path.join(checkpoint_dir, 'best.pt'), payload)
 
-        if ((epoch + 1) % 1 == 0) and args.evaluate:  # or epoch >= 10
+        if ((epoch + 1) % 1 == 0) and args.evaluate and args.test_during_training:
             acc_top1_reduced1 = 0.
             acc_top5_reduced1 = 0.
             trajectory_success_rate_meter_reduced1 = 0.
@@ -436,7 +438,7 @@ def main_worker(gpu, ngpus_per_node, args):
             acc_top1_reduced = acc_top1_reduced1
             print(trajectory_success_rate_meter_reduced, acc_top1_reduced)
 
-        if ((epoch + 1) % 1 == 0) and args.evaluate:  # or epoch >= 10
+        if ((epoch + 1) % 1 == 0) and args.evaluate and args.test_during_training:
             acc_top1_reduced1 = 0.
             acc_top5_reduced1 = 0.
             trajectory_success_rate_meter_reduced1 = 0.
@@ -486,33 +488,9 @@ def main_worker(gpu, ngpus_per_node, args):
 
 
 def log(output, args):
-    with open(os.path.join(os.path.dirname(__file__), 'log', args.checkpoint_dir + '.txt'), "a") as f:
+    os.makedirs(args.log_root, exist_ok=True)
+    with open(os.path.join(args.log_root, args.checkpoint_dir + '.txt'), "a") as f:
         f.write(output + '\n')
-
-
-def save_checkpoint(state, checkpoint_dir, epoch, n_ckpt=1):
-    torch.save(state, os.path.join(checkpoint_dir, "epoch{:0>4d}.pth.tar".format(epoch)))
-    if epoch - n_ckpt >= 0:
-        oldest_ckpt = os.path.join(checkpoint_dir, "epoch{:0>4d}.pth.tar".format(epoch - n_ckpt))
-        if os.path.isfile(oldest_ckpt):
-            os.remove(oldest_ckpt)
-
-
-def save_checkpoint2(state, checkpoint_dir, old_epoch, epoch, rank):
-    torch.save(state, os.path.join(checkpoint_dir, "epoch{:0>4d}_{}.pth.tar".format(epoch, rank)))
-    if old_epoch > 0:
-        oldest_ckpt = os.path.join(checkpoint_dir, "epoch{:0>4d}_{}.pth.tar".format(old_epoch, rank))
-        if os.path.isfile(oldest_ckpt):
-            os.remove(oldest_ckpt)
-
-
-def get_last_checkpoint(checkpoint_dir):
-    all_ckpt = glob.glob(os.path.join(checkpoint_dir, 'epoch*.pth.tar'))
-    if all_ckpt:
-        all_ckpt = sorted(all_ckpt)
-        return all_ckpt[-1]
-    else:
-        return ''
 
 
 if __name__ == "__main__":

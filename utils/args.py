@@ -168,6 +168,10 @@ def get_args(description='whl'):
                         help='distributed backend')
     parser.add_argument('--seed', default=217, type=int,
                         help='seed for initializing training. ')
+    parser.add_argument('--sampling_seed', default=42, type=int,
+                        help='fixed seed for deterministic PDPP validation/export sampling')
+    parser.add_argument('--test_during_training', action='store_true',
+                        help='run Base and Novel test sets each epoch; disabled by default to prevent test leakage')
     parser.add_argument('--gpu', default=None, type=int,
                         help='GPU id to use.')
     parser.add_argument('--multiprocessing-distributed', action='store_true',

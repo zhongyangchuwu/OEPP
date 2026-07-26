@@ -105,7 +105,7 @@ class GaussianDiffusion(nn.Module):
             / extract(self.sqrt_recipm1_alphas_cumprod, t, x_t.shape)
 
     @torch.no_grad()
-    def p_sample_ddim(self, x, cond, t, t_prev, if_prev=False):
+    def p_sample_ddim(self, x, cond, t, t_prev, if_prev=False, generator=None):
         b, *_, device = *x.shape, x.device
         x_recon = self.model(x, t, cond)
 
@@ -126,7 +126,7 @@ class GaussianDiffusion(nn.Module):
                 * torch.sqrt(1 - alpha_bar / alpha_bar_prev)
         )
 
-        noise = torch.randn_like(x) * self.random_ratio
+        noise = torch.randn(x.shape, device=x.device, dtype=x.dtype, generator=generator) * self.random_ratio
         mean_pred = (
                 x_recon * torch.sqrt(alpha_bar_prev)
                 + torch.sqrt(1 - alpha_bar_prev - sigma ** 2) * eps
@@ -136,22 +136,22 @@ class GaussianDiffusion(nn.Module):
         return mean_pred + nonzero_mask * sigma * noise
 
     @torch.no_grad()
-    def p_sample(self, x, cond, t):
+    def p_sample(self, x, cond, t, generator=None):
         b, *_, device = *x.shape, x.device
         model_mean, _, model_log_variance = self.p_mean_variance(x=x, cond=cond, t=t)
-        noise = torch.randn_like(x) * self.random_ratio
+        noise = torch.randn(x.shape, device=x.device, dtype=x.dtype, generator=generator) * self.random_ratio
         nonzero_mask = (1 - (t == 0).float()).reshape(b, *((1,) * (len(x.shape) - 1)))
         return model_mean + nonzero_mask * (0.5 * model_log_variance).exp() * noise
 
     @torch.no_grad()
-    def p_sample_loop(self, cond, length, if_jump):
+    def p_sample_loop(self, cond, length, if_jump, generator=None):
         device = self.betas.device
         batch_size = len(cond[0])
         horizon = length    # self.horizon
         shape = (batch_size, horizon, self.class_dim + self.action_dim + self.observation_dim + self.horizon_dim)
         # shape = (batch_size, horizon, self.action_dim)
 
-        x = torch.randn(shape, device=device) * self.random_ratio
+        x = torch.randn(shape, device=device, generator=generator) * self.random_ratio
         x = condition_projection(x, cond, self.action_dim, self.class_dim, self.horizon_dim)
 
         '''
@@ -160,7 +160,7 @@ class GaussianDiffusion(nn.Module):
         if not if_jump:
             for i in reversed(range(0, self.n_timesteps)):
                 timesteps = torch.full((batch_size,), i, device=device, dtype=torch.long)
-                x = self.p_sample(x, cond, timesteps)
+                x = self.p_sample(x, cond, timesteps, generator=generator)
                 x = condition_projection(x, cond, self.action_dim, self.class_dim, self.horizon_dim)
 
         else:
@@ -168,10 +168,10 @@ class GaussianDiffusion(nn.Module):
                 timesteps = torch.full((batch_size,), self.ddim_timestep_seq[i], device=device, dtype=torch.long)
                 if i == 0:
                     timesteps_prev = torch.full((batch_size,), 0, device=device, dtype=torch.long)
-                    x = self.p_sample_ddim(x, cond, timesteps, timesteps_prev, True)
+                    x = self.p_sample_ddim(x, cond, timesteps, timesteps_prev, True, generator=generator)
                 else:
                     timesteps_prev = torch.full((batch_size,), self.ddim_timestep_seq[i-1], device=device, dtype=torch.long)
-                    x = self.p_sample_ddim(x, cond, timesteps, timesteps_prev)
+                    x = self.p_sample_ddim(x, cond, timesteps, timesteps_prev, generator=generator)
                 x = condition_projection(x, cond, self.action_dim, self.class_dim, self.horizon_dim)
 
         '''
@@ -207,5 +207,5 @@ class GaussianDiffusion(nn.Module):
         t = torch.randint(0, self.n_timesteps, (batch_size,), device=x.device).long()   # for diffusion
         return self.p_losses(x, cond, t)
 
-    def forward(self, cond, length, if_jump=False):
-        return self.p_sample_loop(cond, length, if_jump)
+    def forward(self, cond, length, if_jump=False, generator=None):
+        return self.p_sample_loop(cond, length, if_jump, generator=generator)
