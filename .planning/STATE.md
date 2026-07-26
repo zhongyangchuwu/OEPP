@@ -17,9 +17,9 @@ See: `.planning/PROJECT.md` (updated 2026-07-22)
 
 ## Current Position
 
-Phase: Experiment 4 embedding-analysis execution complete; OpenRouter Gemini 3 Flash Preview Table V full evaluation is running sequentially.
-Status: The three final Experiment 4 exports are now local under `embedding_results/`; their six raw NPZ SHA-256 values match the server, every artifact contract passes, and the PDPP fixed-seed repeat is elementwise equal. The persistent Gemini process completed its 855-sample Base phase and remains running for the sequential Novel phase; full Gemini metrics remain pending its completion and audit.
-Last activity: 2026-07-26 — prepared `STATUS-BRIEF-20260726.md` in the current workspace for the 8 PM report, verified local final tensors against the server, and captured the nonblocking Gemini run status.
+Phase: Experiment 4 embedding-analysis execution complete; OpenRouter Gemini 3 Flash Preview Table V full evaluation complete and audited.
+Status: The three final Experiment 4 exports are local under `embedding_results/`; their six raw NPZ SHA-256 values match the server, every artifact contract passes, and the PDPP fixed-seed repeat is elementwise equal. Gemini completed Base 855 / 855 and Novel 1,297 / 1,297 under the Japan VPN route; coverage is one-to-one, all 2,152 API responses returned `google/gemini-3-flash-preview` from Google, and paper-compatible / strict metrics are archived in the current-workspace `REPORT.md` §15.
+Last activity: 2026-07-26 — audited Gemini full-run coverage, provider metadata, failures, dual scores, costs, and video-cluster paired comparison with Qwen and historical GPT replay.
 
 ## Accumulated Context
 
@@ -54,6 +54,7 @@ Last activity: 2026-07-26 — prepared `STATUS-BRIEF-20260726.md` in the current
 - The Qwen3-VL-32B full run completed with provider responses for all Base 855 and Novel 1,297 observations and zero API failures. `paper_compatible`: Base `1.52/27.22/31.35`, Novel `3.93/29.74/51.77`; strict Qwen results remain in current-workspace `REPORT.md` §12.
 - Publication-readiness audit: artifact coverage is one-to-one; all response IDs are unique and end with `stop`; every strict failure is an out-of-pool action rather than a malformed/truncated sequence. The Table V result is publishable as a hosted-API baseline with explicit comparability, provider-versioning, image-preprocessing, candidate-order, and training-contamination caveats; it is not a controlled Qwen-versus-GPT capability claim. Details: current-workspace `REPORT.md` §13.
 - OpenRouter account metadata on 2026-07-26 confirmed that `google/gemini-3.1-flash-lite` and `google/gemini-3-flash-preview` accept image input and text output. Flash-Lite's two Base attempts and the initial Flash Preview attempt returned non-retryable 403 region errors; a Japan VPN Flash Preview retry returned a four-line, in-pool parsed response from Google with 7,281 prompt / 30 completion tokens and reported cost `$0.0037305`. Novel was not called. Details: current-workspace `REPORT.md` §14.
+- Gemini Flash Preview full audit: Base 855 / Novel 1,297 manifest-request-response-prediction IDs are unique and identical per split; 2,152 / 2,152 API responses returned `google/gemini-3-flash-preview` via Google under the Japan VPN route. Paper-compatible Base `5.61/36.70/47.96`, Novel `12.26/42.44/66.57`; strict Base unchanged and Novel `12.26/42.42/66.51` (SR/Acc/mIoU). There were 0 API failures and 6 strict failures: four token-cap degeneracies and two Novel out-of-pool action names. Audit: `oepp_api_eval/runs/openrouter_gemini3flashpreview_full_audit_20260726.json`; report: current-workspace `REPORT.md` §15.
 
 ### Blockers/Concerns
 
@@ -61,11 +62,11 @@ Last activity: 2026-07-26 — prepared `STATUS-BRIEF-20260726.md` in the current
 - **Full-run verification:** all 2,152 samples have provider responses and strict/paper-compatible metric files; the only outstanding MLLM cost caveat is that the user-supplied estimate is not a provider price record.
 - **Publication caveat:** model alias/revision, `image_detail=auto` preprocessing, unset provider sampling defaults, one candidate order, one API sweep, and opaque training data prevent a fully controlled architecture comparison. State these limitations beside any Qwen/GPT comparison; do not present them as hidden nuisance errors.
 - **Embedding follow-up:** all planned server-side execution and artifact checks are complete. Before scientific claims, review all pre-specified figures and summaries without cherry-picking; archive/download the three complete server export directories using a resumable single-file transfer when local analysis is needed.
-- **OpenRouter Gemini constraint:** `google/gemini-3.1-flash-lite` remains region-unavailable. `google/gemini-3-flash-preview` is accessible only under the observed Japan VPN route; its T4 full run is active after passing the Base/Novel transport pilot. Do not change VPN, model, prompt, candidate order, or provider-selection conditions mid-run; audit coverage and routing metadata only after it exits.
+- **OpenRouter Gemini constraint:** `google/gemini-3.1-flash-lite` remains region-unavailable. `google/gemini-3-flash-preview` completed this full T4 run only under the observed Japan VPN route; its preview revision, provider routing, geographic availability, visual preprocessing and API repeat variance remain unfrozen. Report it as a dated, route-conditioned hosted-API baseline rather than a portable capability ranking.
 - **Table V horizon scope:** the current hosted-API results deliberately cover only the historical `T=4`, 3+3 image comparator row. The paper also contains `T=3` rows, and historical T3 sequences/scripts/results exist under `OEPP_server/LLM`; however, the specialized portable visual extractor and manifest builder hard-code `HORIZON = 4`. `EXP-01` remains incomplete until T3 is separately extracted, replay-validated, piloted, and evaluated. The Experiment 4 `T=3` embedding study is not a substitute for that API evaluation.
 
 ## Session Continuity
 
 Last session: 2026-07-26  
-Stopped at: the persistent `google/gemini-3-flash-preview` T4 full run had completed Base and was continuing sequentially to Novel. Do not wait interactively; the current nonblocking status is recorded at the top of this file.
+Stopped at: Gemini Flash Preview T4 Base / Novel full run completed and was audited. The next unresolved MLLM scope item is separate Table V T3 visual extraction, replay validation, pilot and full evaluation.
 Resume file: `.planning/STATE.md`
