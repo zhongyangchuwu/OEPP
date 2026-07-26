@@ -61,10 +61,11 @@ Last activity: 2026-07-26 — prepared `STATUS-BRIEF-20260726.md` in the current
 - **Full-run verification:** all 2,152 samples have provider responses and strict/paper-compatible metric files; the only outstanding MLLM cost caveat is that the user-supplied estimate is not a provider price record.
 - **Publication caveat:** model alias/revision, `image_detail=auto` preprocessing, unset provider sampling defaults, one candidate order, one API sweep, and opaque training data prevent a fully controlled architecture comparison. State these limitations beside any Qwen/GPT comparison; do not present them as hidden nuisance errors.
 - **Embedding follow-up:** all planned server-side execution and artifact checks are complete. Before scientific claims, review all pre-specified figures and summaries without cherry-picking; archive/download the three complete server export directories using a resumable single-file transfer when local analysis is needed.
-- **OpenRouter Gemini constraint:** `google/gemini-3.1-flash-lite` remains region-unavailable. `google/gemini-3-flash-preview` is accessible only under the observed Japan VPN route; repeat Base/Novel transport pilots must confirm that route remains usable before any approved full run. Do not substitute models automatically.
+- **OpenRouter Gemini constraint:** `google/gemini-3.1-flash-lite` remains region-unavailable. `google/gemini-3-flash-preview` is accessible only under the observed Japan VPN route; its T4 full run is active after passing the Base/Novel transport pilot. Do not change VPN, model, prompt, candidate order, or provider-selection conditions mid-run; audit coverage and routing metadata only after it exits.
+- **Table V horizon scope:** the current hosted-API results deliberately cover only the historical `T=4`, 3+3 image comparator row. The paper also contains `T=3` rows, and historical T3 sequences/scripts/results exist under `OEPP_server/LLM`; however, the specialized portable visual extractor and manifest builder hard-code `HORIZON = 4`. `EXP-01` remains incomplete until T3 is separately extracted, replay-validated, piloted, and evaluated. The Experiment 4 `T=3` embedding study is not a substitute for that API evaluation.
 
 ## Session Continuity
 
 Last session: 2026-07-26  
-Stopped at: a Japan VPN retry of `google/gemini-3-flash-preview` completed one six-image Base Table V request with strict legacy parsing success. It is transport/format evidence only; no Novel or full evaluation request was sent.
+Stopped at: the persistent `google/gemini-3-flash-preview` T4 full run had completed Base and was continuing sequentially to Novel. Do not wait interactively; the current nonblocking status is recorded at the top of this file.
 Resume file: `.planning/STATE.md`
