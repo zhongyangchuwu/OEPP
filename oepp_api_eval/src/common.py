@@ -5,9 +5,10 @@ import importlib
 import json
 import os
 import tempfile
+from collections.abc import Iterable
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 from urllib.parse import urlparse
 
 EXPERIMENT_ROOT = Path(__file__).resolve().parents[1]

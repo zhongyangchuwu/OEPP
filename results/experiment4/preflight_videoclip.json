@@ -1,0 +1,103 @@
+{
+  "errors": [
+    "train data contract failed",
+    "validation data contract failed",
+    "base data contract failed",
+    "novel data contract failed",
+    "PyTorch is not installed"
+  ],
+  "feature": "videoclip",
+  "splits": {
+    "base": {
+      "feature_content_error_count": 0,
+      "feature_content_error_examples": [],
+      "missing_action_embedding_count": 0,
+      "missing_action_embedding_examples": [],
+      "missing_feature_count": 416,
+      "missing_feature_examples": [
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_u4okhX3UyNs.npy",
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_lUUe0FSfgCI.npy",
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_ZEukuiJGCVo.npy",
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_lcAL72SJCJ8.npy",
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_jwtZ6iYYtCI.npy",
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_S5L2PEKOnT0.npy",
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_GjfvIgRnv58.npy",
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_hBRg2LWU0lM.npy",
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_bg3NM780ZGk.npy",
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_LyRVxDj8u5s.npy"
+      ],
+      "unknown_action_count": 0,
+      "unknown_action_examples": [],
+      "videos": 416
+    },
+    "novel": {
+      "feature_content_error_count": 0,
+      "feature_content_error_examples": [],
+      "missing_action_embedding_count": 0,
+      "missing_action_embedding_examples": [],
+      "missing_feature_count": 733,
+      "missing_feature_examples": [
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_0R9pdc9dO3Q.npy",
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_N5wOzlDvpVM.npy",
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_huFjPGrq1Og.npy",
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_x3mP6poDdbY.npy",
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_2zqpJb-3SyI.npy",
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_14bRmzauQFE.npy",
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_GAh9lQmaEvI.npy",
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_Mk9lciiwkqQ.npy",
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_qZdekrHck8w.npy",
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_pw89Ed5AdLo.npy"
+      ],
+      "unknown_action_count": 0,
+      "unknown_action_examples": [],
+      "videos": 733
+    },
+    "train": {
+      "feature_content_error_count": 0,
+      "feature_content_error_examples": [],
+      "missing_action_embedding_count": 0,
+      "missing_action_embedding_examples": [],
+      "missing_feature_count": 1285,
+      "missing_feature_examples": [
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_2ffYeuTjjvI.npy",
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_53MYuHDbg5E.npy",
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_7zgDZR1B3zM.npy",
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_s0mn6LoU1kA.npy",
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_bZmlEbzPJlM.npy",
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_lHv-ozyx0zY.npy",
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_FBO0sxzhqQQ.npy",
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_shdK5Kaz9hY.npy",
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_lvxox2L8qmY.npy",
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_PR7D2bzuQKM.npy"
+      ],
+      "unknown_action_count": 0,
+      "unknown_action_examples": [],
+      "videos": 1285
+    },
+    "validation": {
+      "feature_content_error_count": 0,
+      "feature_content_error_examples": [],
+      "missing_action_embedding_count": 0,
+      "missing_action_embedding_examples": [],
+      "missing_feature_count": 337,
+      "missing_feature_examples": [
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_sMflQ9h_zBM.npy",
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_M_UGoUYZALA.npy",
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_TS3ZiDWK8Os.npy",
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_A3cgqmVVyqI.npy",
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_e7KBn7l63bU.npy",
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_PwDRxPWUJWM.npy",
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_TYX3WsnNpzQ.npy",
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_MdBUZn1PG58.npy",
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_m3YLEnJ1Am4.npy",
+        "/data0/wuyilu/data/OEPP_videoclip/COIN_lOKwfz_wMI4.npy"
+      ],
+      "unknown_action_count": 0,
+      "unknown_action_examples": [],
+      "videos": 337
+    }
+  },
+  "torch": {
+    "installed": false
+  }
+}

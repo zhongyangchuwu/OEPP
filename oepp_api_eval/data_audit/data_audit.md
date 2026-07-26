@@ -1,6 +1,6 @@
 # OEPP API Evaluation Data Audit
 
-Generated: `2026-07-22T10:50:52+00:00`
+Generated: `2026-07-26T03:54:37+00:00`
 Data root: `/home/han/research/OEPP/data`
 
 ## Paper consistency
@@ -16,10 +16,10 @@ Data root: `/home/han/research/OEPP/data`
 
 | Split | T=3 | T=4 |
 |---|---:|---:|
-| train | 3268 | 2265 |
-| validation | 806 | 546 |
-| base | 1058 | 722 |
-| novel | 1544 | 958 |
+| train | 3550 | 2818 |
+| validation | 883 | 701 |
+| base | 1138 | 888 |
+| novel | 1691 | 1297 |
 
 ## Action pools
 

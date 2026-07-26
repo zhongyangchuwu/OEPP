@@ -66,7 +66,7 @@
       "path": "vc_action_feat_dict.json"
     }
   ],
-  "generated_at": "2026-07-22T10:50:52+00:00",
+  "generated_at": "2026-07-26T03:54:37+00:00",
   "splits": {
     "base": {
       "action_fields": [
@@ -115,8 +115,8 @@
       ],
       "segments": 1888,
       "sequence_windows": {
-        "T3": 1058,
-        "T4": 722
+        "T3": 1138,
+        "T4": 888
       },
       "videos": 416
     },
@@ -164,8 +164,8 @@
       ],
       "segments": 3010,
       "sequence_windows": {
-        "T3": 1544,
-        "T4": 958
+        "T3": 1691,
+        "T4": 1297
       },
       "videos": 733
     },
@@ -222,8 +222,8 @@
       ],
       "segments": 5833,
       "sequence_windows": {
-        "T3": 3268,
-        "T4": 2265
+        "T3": 3550,
+        "T4": 2818
       },
       "videos": 1285
     },
@@ -272,8 +272,8 @@
       ],
       "segments": 1479,
       "sequence_windows": {
-        "T3": 806,
-        "T4": 546
+        "T3": 883,
+        "T4": 701
       },
       "videos": 337
     }

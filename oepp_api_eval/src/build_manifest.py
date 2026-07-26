@@ -139,7 +139,10 @@ def _select_windows(
 def _sample_id(
     split: str, record_index: int, record: dict[str, Any], start_step: int, horizon: int
 ) -> str:
-    return f"{split}_T{horizon}_{record['dataset']}_{record_index:04d}_{record['vid']}_{start_step:02d}"
+    return (
+        f"{split}_T{horizon}_{record['dataset']}_{record_index:04d}_"
+        f"{record['vid']}_{start_step:02d}"
+    )
 
 
 def _candidate_order_tag(candidate_order: str, candidate_order_seed: int | None) -> str:
@@ -168,6 +171,9 @@ def build_manifest(arguments: argparse.Namespace) -> list[dict[str, Any]]:
             selected_pool, arguments.candidate_order, arguments.candidate_order_seed
         )
         action_to_id = {candidate["text"]: candidate["id"] for candidate in candidates}
+        candidate_order_tag = _candidate_order_tag(
+            arguments.candidate_order, arguments.candidate_order_seed
+        )
         for horizon in arguments.horizons:
             windows = _select_windows(
                 records, horizon, arguments.limit_per_split, arguments.selection_seed
@@ -207,15 +213,18 @@ def build_manifest(arguments: argparse.Namespace) -> list[dict[str, Any]]:
                             {
                                 "sample_id": sample_id,
                                 "image_setting": image_setting,
-                                "error": f"ground truth missing from candidate pool: {missing_actions}",
+                                "error": (
+                                    "ground truth missing from candidate pool: "
+                                    f"{missing_actions}"
+                                ),
                             }
                         )
                         continue
                     manifests.append(
                         {
                             "sample_id": (
-                                f"{sample_id}_{image_setting.replace('+', 'x')}_{arguments.pool_type}_"
-                                f"{_candidate_order_tag(arguments.candidate_order, arguments.candidate_order_seed)}"
+                                f"{sample_id}_{image_setting.replace('+', 'x')}_"
+                                f"{arguments.pool_type}_{candidate_order_tag}"
                             ),
                             "vid": record["vid"],
                             "dataset": record["dataset"],
