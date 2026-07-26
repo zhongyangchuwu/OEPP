@@ -150,11 +150,19 @@ def save_direct_checkpoint(
     os.replace(temporary, destination)
 
 
-def load_direct_checkpoint(path: Union[str, Path], device: torch.device) -> dict[str, Any]:
-    try:
-        checkpoint = torch.load(path, map_location=device, weights_only=True)
-    except TypeError:
-        checkpoint = torch.load(path, map_location=device)
+def load_direct_checkpoint(
+    path: Union[str, Path], device: torch.device, *, trust_checkpoint: bool = False
+) -> dict[str, Any]:
+    if trust_checkpoint:
+        checkpoint = torch.load(path, map_location=device, weights_only=False)
+    else:
+        try:
+            checkpoint = torch.load(path, map_location=device, weights_only=True)
+        except TypeError as error:
+            raise RuntimeError(
+                "This PyTorch runtime cannot safely load state-dict checkpoints. "
+                "Use a supported runtime, or explicitly trust the checkpoint source."
+            ) from error
     if checkpoint.get("format") != DIRECT_CHECKPOINT_FORMAT:
         raise ValueError(
             f"{path} is not a {DIRECT_CHECKPOINT_FORMAT} checkpoint; "

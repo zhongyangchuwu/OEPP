@@ -29,6 +29,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--checkpoint", required=True, type=Path)
     parser.add_argument("--output-dir", type=Path, default=None)
     parser.add_argument("--batch-size", type=int, default=128)
+    parser.add_argument(
+        "--trust-checkpoint",
+        action="store_true",
+        help="Allow pickle loading only for a checkpoint you generated and trust.",
+    )
     parser.add_argument("--device", default="cuda")
     return parser.parse_args()
 
@@ -40,7 +45,9 @@ def main() -> None:
     device = torch.device(args.device)
     if device.type == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("CUDA is required for OEPP embedding export but is unavailable")
-    checkpoint = load_direct_checkpoint(args.checkpoint, device)
+    checkpoint = load_direct_checkpoint(
+        args.checkpoint, device, trust_checkpoint=args.trust_checkpoint
+    )
     config = checkpoint["config"]
     split = int(config["split"])
     horizon = int(config["T"])

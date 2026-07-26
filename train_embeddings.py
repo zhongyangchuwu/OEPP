@@ -161,7 +161,7 @@ def main() -> None:
         "feature": feature,
         "videoclip_root": str(videoclip_root()) if feature == "videoclip" else None,
         "device": str(device),
-        "torch_version": torch.__version__,
+        "torch_version": str(torch.__version__),
         "fresh_initialization": True,
         "legacy_loss_semantics": "CrossEntropyLoss receives softmax(cosine/0.1), matching OEPP/train.py",
     }
