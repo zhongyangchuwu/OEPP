@@ -39,9 +39,9 @@ SILICONFLOW_QWEN_MODEL=Qwen/Qwen3-VL-32B-Instruct
 
 Export `SILICONFLOW_API_KEY` in the same shell. The key is never read into a config snapshot, a log, or a JSONL artifact.
 
-### OpenRouter Gemini 3.1 Flash Lite
+### OpenRouter Gemini configurations
 
-The checked-in OpenRouter Base/Novel Table V configurations are also offline. They use `OPENROUTER_API_KEY`, `https://openrouter.ai/api/v1`, and the account-verified model ID `google/gemini-3.1-flash-lite`; copy them into ignored `private/` before enabling any calls. Query the authenticated `GET /api/v1/models` inventory and retain its model/pricing snapshot before a pilot or full run. OpenRouter may route a request across eligible upstream providers, so keep its returned routing metadata with the raw response and never silently replace a region-unavailable model.
+The checked-in OpenRouter Base/Novel Table V configurations are offline. `openrouter_gemini31flashlite_*` uses `OPENROUTER_GEMINI_MODEL`; `openrouter_gemini3flashpreview_*` uses `OPENROUTER_GEMINI3_FLASH_PREVIEW_MODEL`. Both use `OPENROUTER_API_KEY` and `https://openrouter.ai/api/v1`; copy a matching config into ignored `private/` before enabling any calls. Query the authenticated `GET /api/v1/models` inventory and retain its model/pricing snapshot before a pilot or full run. OpenRouter may route a request across eligible upstream providers, so keep its returned routing metadata with the raw response and never silently replace a region-unavailable model.
 
 ## Table V T=4, 3+3 API protocol
 
