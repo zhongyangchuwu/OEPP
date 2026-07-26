@@ -18,8 +18,8 @@ See: `.planning/PROJECT.md` (updated 2026-07-22)
 ## Current Position
 
 Phase: Experiment 4 embedding-analysis implementation  
-Status: Fresh MLP, Transformer, and PDPP checkpoint/export paths are implemented locally. The models share unchanged OEPP annotations/features and a standard embedding artifact schema, but each run remains separate. Runtime validation and server execution are blocked on server access, CUDA/Torch, and `/data0` feature availability.  
-Last activity: 2026-07-26 — added fresh direct-model trainer/exporter, PDPP state-dict lifecycle and seeded exporter, stable dataset metadata, plotting dependency, server commands, and one root uv project with CPU/CUDA extras.
+Status: Fresh MLP, Transformer, and PDPP checkpoint/export paths are implemented locally. The validated 2,771-member VideoCLIP archive is ready to extract under `features/OEPP_videoclip`; all loaders resolve this location or the `OEPP_VIDEOCLIP_ROOT` override. Runtime validation and server execution remain blocked on an SSH host, CUDA runtime, and transferring the archive to `/data1/wuyilu/OEPP-hjr`.
+Last activity: 2026-07-26 — validated the VideoCLIP archive against every annotation, removed the machine-specific VideoCLIP mount requirement, and added one root uv project with CPU/CUDA extras.
 
 ## Accumulated Context
 
@@ -57,7 +57,7 @@ Last activity: 2026-07-26 — added fresh direct-model trainer/exporter, PDPP st
 - **MLLM result scope:** Table V Qwen results are now scored and documented. Keep Base/Novel, prompt version, candidate order, and `paper_compatible`/`strict` metrics separate in all later analyses; raw requests, responses, predictions, ledger, and per-sample scores are retained under `oepp_api_eval/runs/`.
 - **Full-run verification:** all 2,152 samples have provider responses and strict/paper-compatible metric files; the only outstanding MLLM cost caveat is that the user-supplied estimate is not a provider price record.
 - **Publication caveat:** model alias/revision, `image_detail=auto` preprocessing, unset provider sampling defaults, one candidate order, one API sweep, and opaque training data prevent a fully controlled architecture comparison. State these limitations beside any Qwen/GPT comparison; do not present them as hidden nuisance errors.
-- **Embedding execution blocker:** this harness has no SSH host configuration, CUDA/Torch runtime, `/data0/wuyilu/data/OEPP_videoclip`, or `/data1` mount. The implementation is ready for a server pull; run `embedding_preflight.py`, the server test suite, a 10-epoch calibration, then fresh model runs.
+- **Embedding execution blocker:** the 2,771-file VideoCLIP archive is locally available and exactly matches the annotations, but no SSH host is configured to transfer it to `/data1/wuyilu/OEPP-hjr`. Once uploaded under `features/OEPP_videoclip`, run default server preflight, the server test suite, a 10-epoch calibration, then fresh model runs.
 
 ## Session Continuity
 

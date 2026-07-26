@@ -2,3 +2,5 @@ __pycache__/
 .venv/
 .ruff_cache/
 .pytest_cache/
+features/
+OEPP_videoclip.zip

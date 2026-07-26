@@ -12,6 +12,7 @@ import torch.utils.data
 import torch.utils.data.distributed
 from torch.distributed import ReduceOp
 from dataset.dataset import Seq_action
+from feature_paths import videoclip_root
 
 import utils
 from embedding_support import annotation_hashes, write_json
@@ -229,6 +230,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 'fresh_initialization': not args.resume,
                 'args': vars(args).copy(),
                 'annotation_hashes': annotation_hashes('data', args.split, args.feat),
+                'videoclip_root': str(videoclip_root()) if args.feat == 'videoclip' else None,
             },
         )
     if args.resume:

@@ -6,6 +6,7 @@ from pathlib import Path
 
 import torch
 
+from feature_paths import videoclip_root
 from dataset.dataset import Seq_action
 from embedding_artifacts import export_split, render_figures, save_candidate_embeddings, write_combined_summary
 from embedding_support import (
@@ -100,6 +101,7 @@ def main() -> None:
             "config": config,
             "device": str(device),
             "batch_size": args.batch_size,
+            "videoclip_root": str(videoclip_root()) if feature == "videoclip" else None,
             "splits": {name: len(dataset) for name, dataset in datasets.items()},
         },
     )

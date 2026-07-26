@@ -1,8 +1,11 @@
 
-import torch
-import os
 import json
+import os
+
 import numpy as np
+import torch
+
+from feature_paths import videoclip_feature_path, videoclip_root
 class Video(torch.utils.data.Dataset):
     def __init__(self,
                  root,
@@ -13,6 +16,7 @@ class Video(torch.utils.data.Dataset):
         self.split = split
         self.is_val = is_val
         self.feat = feat
+        self.videoclip_root = videoclip_root() if self.feat == 'videoclip' else None
         self.M = 3
         if self.feat == 's3d':
             self.zeros_frame = torch.zeros(512)
@@ -58,8 +62,9 @@ class Video(torch.utils.data.Dataset):
                                    allow_pickle=True)
                 images = images_d['frames_features']
         elif self.feat == 'videoclip':
-            name = video_id['dataset'] + '_' + video_id['vid'] + '.npy'
-            images = np.load(os.path.join('/data0/wuyilu/data/OEPP_videoclip', name))
+            images = np.load(
+                videoclip_feature_path(video_id['dataset'], video_id['vid'], self.videoclip_root)
+            )
         # print(images.shape)
 
         start_frames_list = []

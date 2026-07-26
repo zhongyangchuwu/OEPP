@@ -6,17 +6,34 @@ import json
 import sys
 from pathlib import Path
 from typing import Any
+from feature_paths import videoclip_feature_path, videoclip_root
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Verify OEPP annotations, action embeddings, feature files, and CUDA.")
+    parser = argparse.ArgumentParser(
+        description="Verify OEPP annotations, action embeddings, feature files, and CUDA."
+    )
     parser.add_argument("--data-root", type=Path, default=Path("data"))
     parser.add_argument("--feature", choices=("videoclip", "s3d"), default="videoclip")
-    parser.add_argument("--videoclip-root", type=Path, default=Path("/data0/wuyilu/data/OEPP_videoclip"))
+    parser.add_argument(
+        "--videoclip-root",
+        type=Path,
+        default=None,
+        help="Feature directory; defaults to OEPP_VIDEOCLIP_ROOT or features/OEPP_videoclip.",
+    )
     parser.add_argument("--coin-s3d-root", type=Path, default=Path("/data0/wuyilu/data/COIN/full_npy"))
     parser.add_argument("--crosstask-s3d-root", type=Path, default=Path("/data0/wuyilu/data/ori_processed_data"))
     parser.add_argument("--output", type=Path, default=None)
-    parser.add_argument("--verify-feature-content", action="store_true", help="load every feature and verify its embedding dimension")
+    parser.add_argument(
+        "--verify-feature-content",
+        action="store_true",
+        help="Load every feature and verify its embedding dimension.",
+    )
+    parser.add_argument(
+        "--skip-cuda-check",
+        action="store_true",
+        help="Validate data without requiring CUDA; never use this for server training preflight.",
+    )
     return parser.parse_args()
 
 
@@ -26,7 +43,7 @@ def load_json(path: Path) -> Any:
 
 def feature_path(record: dict[str, Any], args: argparse.Namespace) -> Path:
     if args.feature == "videoclip":
-        return args.videoclip_root / f"{record['dataset']}_{record['vid']}.npy"
+        return videoclip_feature_path(str(record["dataset"]), str(record["vid"]), args.videoclip_root)
     if record["dataset"] == "COIN":
         return args.coin_s3d_root / f"{record['task_name']}_{record['task_id_old']}_{record['vid']}.npy"
     return args.crosstask_s3d_root / f"{record['task_id_old']}_{record['vid']}.npy"
@@ -49,6 +66,7 @@ def feature_content_error(path: Path, feature: str) -> str | None:
 
 def main() -> None:
     args = parse_args()
+    args.videoclip_root = videoclip_root(args.videoclip_root)
     files = {
         "train": args.data_root / "train_train_base_dataset_1.json",
         "validation": args.data_root / "train_val_base_dataset_1.json",
@@ -63,7 +81,13 @@ def main() -> None:
     }
     embedding_file = args.data_root / ("vc_action_feat_dict.json" if args.feature == "videoclip" else "s3d_action_feat_dict.json")
     action_embeddings = load_json(embedding_file)
-    report: dict[str, Any] = {"feature": args.feature, "splits": {}, "errors": []}
+    report: dict[str, Any] = {
+        "feature": args.feature,
+        "feature_root": str(args.videoclip_root) if args.feature == "videoclip" else None,
+        "cuda_check_skipped": args.skip_cuda_check,
+        "splits": {},
+        "errors": [],
+    }
 
     for split_name, annotation_file in files.items():
         if not annotation_file.is_file():
@@ -111,11 +135,12 @@ def main() -> None:
             "device_count": torch.cuda.device_count(),
             "device_name": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
         }
-        if not torch.cuda.is_available():
+        if not torch.cuda.is_available() and not args.skip_cuda_check:
             report["errors"].append("CUDA is unavailable")
     except ImportError:
         report["torch"] = {"installed": False}
-        report["errors"].append("PyTorch is not installed")
+        if not args.skip_cuda_check:
+            report["errors"].append("PyTorch is not installed")
 
     rendered = json.dumps(report, indent=2, sort_keys=True)
     print(rendered)

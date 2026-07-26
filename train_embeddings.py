@@ -11,6 +11,7 @@ import torch
 import torch.nn.functional as functional
 import yaml
 
+from feature_paths import videoclip_root
 from checkpoint_selection import is_better_direct_checkpoint
 from dataset.dataset import Seq_action
 from embedding_support import (
@@ -158,6 +159,7 @@ def main() -> None:
         "annotation_hashes": annotation_hashes(data_root, split, feature),
         "model_name": model_name,
         "feature": feature,
+        "videoclip_root": str(videoclip_root()) if feature == "videoclip" else None,
         "device": str(device),
         "torch_version": torch.__version__,
         "fresh_initialization": True,

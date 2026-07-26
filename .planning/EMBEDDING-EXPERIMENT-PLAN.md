@@ -59,13 +59,13 @@ Before server training:
 Server preflight is one command and must succeed before calibration:
 
 ```bash
-python embedding_preflight.py \
+uv run python embedding_preflight.py \
   --feature videoclip \
   --verify-feature-content \
   --output results/experiment4/preflight_videoclip.json
 ```
 
-It checks CUDA/Torch, all four annotation files, every expected `/data0/wuyilu/data/OEPP_videoclip/<dataset>_<vid>.npy` feature path and 768-dimensional feature shape, split-pool membership, and action-text embedding coverage. It exits nonzero on missing or inconsistent data. Then run `python -m unittest discover -s tests -v` before the 10-epoch calibration.
+It reads `features/OEPP_videoclip` by default, or the directory named by `OEPP_VIDEOCLIP_ROOT`. It checks CUDA/Torch, all four annotation files, every expected `<feature-root>/<dataset>_<vid>.npy` feature path and 768-dimensional feature shape, split-pool membership, and action-text embedding coverage. It exits nonzero on missing or inconsistent data. Run `uv run python -m unittest discover -s tests -v` before the 10-epoch calibration.
 
 Server acceptance checks after a fresh run:
 

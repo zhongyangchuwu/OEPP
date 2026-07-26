@@ -47,10 +47,16 @@ Use `uv run ...` for every repository command. The two PyTorch extras are mutual
 
 ## Download features
 
-Download the features [link](https://drive.google.com/drive/folders/1IKrEnPhIvQhBN-tiIvtn_bG6EtDE8bNs?usp=drive_link)
-and modify the path to the features in the `dataset/dataset.py Line51-62`.
-The S3D feature is extracted by [P3IV](https://github.com/JoeHEZHAO/procedure-planing).
-Note that our videoclip features are currently only available for OEPP. We will release the complete features as soon as possible.
+The archived VideoCLIP features are required for embedding training but are not committed to Git. Download `OEPP_videoclip.zip` from the [feature archive](https://drive.google.com/drive/folders/1IKrEnPhIvQhBN-tiIvtn_bG6EtDE8bNs?usp=drive_link), then extract it into the repository-managed default location:
+
+```bash
+unzip -q OEPP_videoclip.zip -d features
+# Creates features/OEPP_videoclip/<dataset>_<vid>.npy
+```
+
+The archive must provide all 2,771 `[frames, 768]` arrays. `features/` and the zip archive are ignored by Git. To keep features outside the checkout, set `OEPP_VIDEOCLIP_ROOT=/absolute/path/to/OEPP_videoclip` before every preflight, train, and export command; that environment value overrides the default. No change to `dataset/dataset.py` is needed.
+
+S3D is a separate feature protocol. Its COIN and CrossTask archives are only needed when deliberately changing the configuration from `feature: videoclip` to `feature: s3d`.
 
 ## Training
 
@@ -73,7 +79,7 @@ The original PDPP command below is retained in Git history only; it can resume a
 
 The legacy `train.py` and `eval.py` remain available for reproducing their original discrete metrics. For embedding analysis, train from fresh initialization with the state-dict checkpoint runner; it supports both the MLP and Transformer OEPP baselines and never selects on Base or Novel test metrics.
 
-Run this after `uv sync --locked --extra cu118`. It verifies every annotation/action against its split pool, all expected feature file paths, action embeddings, and CUDA/Torch; it exits nonzero on any failure.
+Run this after `uv sync --locked --extra cu118`. By default it reads `features/OEPP_videoclip`; export `OEPP_VIDEOCLIP_ROOT` first when using an external directory. It verifies every annotation/action against its split pool, all expected feature file paths, action embeddings, and CUDA/Torch; it exits nonzero on any failure.
 
 ```bash
 uv run python embedding_preflight.py \
@@ -126,4 +132,4 @@ CUDA_VISIBLE_DEVICES=0 uv run python export_pdpp_embeddings.py \
   --sampling_seed 42
 ```
 
-Before a server run, verify CUDA/Torch, write access, the four annotation JSON files, and `/data0/wuyilu/data/OEPP_videoclip`. No dataset conversion is required: `Seq_action` reads the original annotations and precomputed feature files. The embedding path records stable source-window metadata and rejects an action absent from its selected pool. `matplotlib==3.8.3` is required for the figures.
+Before a server run, verify CUDA/Torch, write access, the four annotation JSON files, and the resolved VideoCLIP root (`features/OEPP_videoclip` by default or `OEPP_VIDEOCLIP_ROOT`). No dataset conversion is required: `Seq_action` reads the original annotations and precomputed feature files. The embedding path records stable source-window metadata and rejects an action absent from its selected pool. `matplotlib==3.8.3` is required for the figures.
