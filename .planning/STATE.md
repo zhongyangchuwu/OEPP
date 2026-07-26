@@ -19,7 +19,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-22)
 
 Phase: Experiment 4 embedding-analysis execution complete; OpenRouter Gemini 3 Flash Preview Table V full evaluation is running sequentially.
 Status: The three final Experiment 4 exports are now local under `embedding_results/`; their six raw NPZ SHA-256 values match the server, every artifact contract passes, and the PDPP fixed-seed repeat is elementwise equal. The persistent Gemini process completed its 855-sample Base phase and remains running for the sequential Novel phase; full Gemini metrics remain pending its completion and audit.
-Last activity: 2026-07-26 — created `.planning/STATUS-BRIEF-20260726.md` for the 8 PM report, verified local final tensors against the server, and captured the nonblocking Gemini run status.
+Last activity: 2026-07-26 — prepared `STATUS-BRIEF-20260726.md` in the current workspace for the 8 PM report, verified local final tensors against the server, and captured the nonblocking Gemini run status.
 
 ## Accumulated Context
 
