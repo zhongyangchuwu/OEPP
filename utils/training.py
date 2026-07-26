@@ -2,6 +2,7 @@ import copy
 
 from model.helpers import AverageMeter
 from .accuracy import *
+from pdpp_runtime import unwrap_model
 
 
 def cycle(dl):
@@ -110,7 +111,7 @@ class Trainer(object):
                     cond1['horizon'] = horizon_onehot1
 
                 x1 = img_tensors1.float()
-                x_output = self.model.module.loss(x1, cond1)
+                x_output = unwrap_model(self.model).loss(x1, cond1)
                 loss = 0
                 x_output = x_output[:, :, args.horizon_dim + args.class_dim:args.horizon_dim + args.class_dim + args.action_dim]
 
