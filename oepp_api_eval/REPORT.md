@@ -387,4 +387,11 @@ embedding_results/
 
 - **模型检索：** 同一 OpenRouter inventory 返回 `google/gemini-3-flash-preview`，其 metadata 声明 `text+image+file+audio+video->text` 并支持 `temperature`、`max_tokens`、`seed` 与 structured outputs；因此它满足 Table V 的输入/输出模态要求。
 - **实际调用：** `2026-07-26T10:08:47+00:00` 对同一 Base observation 以六张已 hash JPEG、`temperature=0`、`max_tokens=512`、无 retry 发出一条请求。它同样返回 HTTP 403 `This model is not available in your region.`，延迟 1.264 s，没有 completion、usage、action prediction 或可报告指标。
-- **结论：** 当前环境的 OpenRouter key/region 无法访问两个经测试的 Google Gemini text-and-image models：`google/gemini-3.1-flash-lite` 与 `google/gemini-3-flash-preview`。这不是模型或 parser 的失败；不要继续枚举模型消耗配额，等待用户明确下一 provider/model 决策。
+- **更新后的结论：** 原始网络路由无法访问两个经测试的 Google Gemini text-and-image models。§14.2 以 Japan VPN retry 更新了 `google/gemini-3-flash-preview` 的可用性结论；`google/gemini-3.1-flash-lite` 在已测试路由上仍不可用。
+
+### 14.2 Japan VPN retry: Gemini 3 Flash Preview
+
+- **实际调用：** 切换至用户提供的 Japan VPN 后，以相同的 Base observation、六张已 hash JPEG、Base legacy v2 prompt、`temperature=0`、`max_tokens=512`、无 retry，再次请求 `google/gemini-3-flash-preview`。
+- **成功结果：** `2026-07-26T10:10:43+00:00` 返回 `finish_reason=stop`，OpenRouter returned model 为请求的 model，路由 provider 为 `Google`，延迟 `4.312 s`。输出恰为四个连续编号、全部属于 Base pool 的 action names；legacy parser 成功得到 action IDs `[42, 42, 42, 62]`。该 response 还携带一条 `google-gemini-v1` reasoning detail，但 usage 的 `reasoning_tokens` 为 `0`。
+- **计量：** response usage 为 7,281 prompt tokens、30 completion tokens、7,311 total tokens，OpenRouter reported cost `$0.0037305`（non-BYOK）。这是一条 transport/format evidence，单样本不能用于报告质量或成本投影。
+- **范围：** 该 success 证明当前 Japan VPN route 可访问此 preview model 和六图 data-URL schema；不证明其他 region、其他 provider route 或 `google/gemini-3.1-flash-lite` 可用。Novel 与额外 Base request 尚未发送。

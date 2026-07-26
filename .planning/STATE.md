@@ -32,7 +32,7 @@ Last activity: 2026-07-26 — audited all three final server-side model artifact
 - Preserve invalid model outputs as evaluation failures; no semantic repair.
 - Preserve the historical Table V visual protocol as `table_v_t4_3x3_legacy_v1`: $T=4$, 3+3 observations, Base→Base and Novel→Novel pools. Qwen3-VL-32B uses a separately versioned `legacy_v2` output constraint; results from distinct prompt versions must never be aggregated.
 - Extract frames on the video server with this fork, then synchronize frame files and relative-path observation indices to the local API workspace. This synchronization is complete for the current Base and Novel Table V sets.
-- OpenRouter is the selected provider for prospective Gemini hosted-API baselines. Both account-visible, multimodal text-output candidates tested so far—`google/gemini-3.1-flash-lite` and `google/gemini-3-flash-preview`—were region-unavailable; a region error must block rather than silently fall back to another model.
+- OpenRouter is the selected provider for prospective Gemini hosted-API baselines. `google/gemini-3.1-flash-lite` remained region-unavailable, while one `google/gemini-3-flash-preview` Table V Base request succeeded after switching to the user-provided Japan VPN; geographic route is therefore a reproducibility constraint, not a reason to silently fall back.
 
 ### Current task requirements
 
@@ -53,7 +53,7 @@ Last activity: 2026-07-26 — audited all three final server-side model artifact
 - A pre-full-run audit reproduced the paper's ChatGPT-4o-latest $T=4$, 3-image row from `OEPP_server` exactly. The discovered prompt, alias, and scoring differences were corrected; `paper_compatible` replay now reproduces the published Base/Novel values while `strict` reports 37/56 historical candidate-compliance failures. Details: `oepp_api_eval/REPORT.md` §10.
 - The Qwen3-VL-32B full run completed with provider responses for all Base 855 and Novel 1,297 observations and zero API failures. `paper_compatible`: Base `1.52/27.22/31.35`, Novel `3.93/29.74/51.77`; `strict`: Base `1.52/25.99/29.98` with 73 failures, Novel `3.93/28.87/50.29` with 57 failures. Full evidence: `oepp_api_eval/REPORT.md` §12.
 - Publication-readiness audit: artifact coverage is one-to-one; all response IDs are unique and end with `stop`; every strict failure is an out-of-pool action rather than a malformed/truncated sequence. The Table V result is publishable as a hosted-API baseline with explicit comparability, provider-versioning, image-preprocessing, candidate-order, and training-contamination caveats; it is not a controlled Qwen-versus-GPT capability claim. Details: `oepp_api_eval/REPORT.md` §13.
-- OpenRouter account metadata on 2026-07-26 confirmed that `google/gemini-3.1-flash-lite` and `google/gemini-3-flash-preview` both accept image input and text output. Their two-sample and one-sample Base pilots respectively returned only non-retryable HTTP 403 region-unavailability errors; Novel was not called. Details: `oepp_api_eval/REPORT.md` §14.
+- OpenRouter account metadata on 2026-07-26 confirmed that `google/gemini-3.1-flash-lite` and `google/gemini-3-flash-preview` accept image input and text output. Flash-Lite's two Base attempts and the initial Flash Preview attempt returned non-retryable 403 region errors; a Japan VPN Flash Preview retry returned a four-line, in-pool parsed response from Google with 7,281 prompt / 30 completion tokens and reported cost `$0.0037305`. Novel was not called. Details: `oepp_api_eval/REPORT.md` §14.
 
 ### Blockers/Concerns
 
@@ -61,10 +61,10 @@ Last activity: 2026-07-26 — audited all three final server-side model artifact
 - **Full-run verification:** all 2,152 samples have provider responses and strict/paper-compatible metric files; the only outstanding MLLM cost caveat is that the user-supplied estimate is not a provider price record.
 - **Publication caveat:** model alias/revision, `image_detail=auto` preprocessing, unset provider sampling defaults, one candidate order, one API sweep, and opaque training data prevent a fully controlled architecture comparison. State these limitations beside any Qwen/GPT comparison; do not present them as hidden nuisance errors.
 - **Embedding follow-up:** all planned server-side execution and artifact checks are complete. Before scientific claims, review all pre-specified figures and summaries without cherry-picking; archive/download the three complete server export directories using a resumable single-file transfer when local analysis is needed.
-- **OpenRouter Gemini blocker:** `google/gemini-3.1-flash-lite` and `google/gemini-3-flash-preview` both returned `403 This model is not available in your region`. Do not retry or choose a substitute automatically; resume only after a selected model becomes region-accessible or the user explicitly chooses another provider/model.
+- **OpenRouter Gemini constraint:** `google/gemini-3.1-flash-lite` remains region-unavailable. `google/gemini-3-flash-preview` is accessible only under the observed Japan VPN route; repeat Base/Novel transport pilots must confirm that route remains usable before any approved full run. Do not substitute models automatically.
 
 ## Session Continuity
 
 Last session: 2026-07-26  
-Stopped at: OpenRouter model metadata was retrieved and Table V Base smoke requests were attempted for `google/gemini-3.1-flash-lite` and `google/gemini-3-flash-preview`. All three requests were non-retryable 403 region failures; no Novel request or model fallback was sent.
+Stopped at: a Japan VPN retry of `google/gemini-3-flash-preview` completed one six-image Base Table V request with strict legacy parsing success. It is transport/format evidence only; no Novel or full evaluation request was sent.
 Resume file: `.planning/STATE.md`
