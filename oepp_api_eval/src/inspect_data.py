@@ -28,7 +28,11 @@ IMAGE_SUFFIXES = {".bmp", ".gif", ".jpeg", ".jpg", ".png", ".webp"}
 
 
 def _window_count(records: list[dict[str, Any]], horizon: int) -> int:
-    return sum(max(0, len(record["anno"]) - horizon + 1) for record in records)
+    """Count protocol windows, including one left-padded window for short sequences."""
+    return sum(
+        max(1, len(record["anno"]) - horizon + 1) if record["anno"] else 0
+        for record in records
+    )
 
 
 def _duplicates(values: list[str]) -> dict[str, int]:
@@ -120,7 +124,8 @@ def _render_markdown(audit: dict[str, Any]) -> str:
     )
     for name, details in audit["action_pools"].items():
         lines.append(
-            f"| {name} | {details['entries']} | {details['unique_entries']} | {details['duplicate_entries']} |"
+            f"| {name} | {details['entries']} | {details['unique_entries']} | "
+            f"{details['duplicate_entries']} |"
         )
     lines.extend(
         [
@@ -132,12 +137,16 @@ def _render_markdown(audit: dict[str, Any]) -> str:
         ]
     )
     for name, details in audit["splits"].items():
+        missing_actions = len(details["ground_truth_actions_missing_from_protocol_pool"])
+        length_mismatches = len(details["declared_length_mismatches"])
+        identity_duplicates = len(details["dataset_vid_duplicates"])
         lines.append(
-            f"- **{name}:** {len(details['ground_truth_actions_missing_from_protocol_pool'])} ground-truth actions outside its protocol pool; "
-            f"{len(details['declared_length_mismatches'])} declared-length mismatches; "
-            f"{len(details['dataset_vid_duplicates'])} duplicate `(dataset, vid)` identities."
+            f"- **{name}:** {missing_actions} ground-truth actions outside its protocol pool; "
+            f"{length_mismatches} declared-length mismatches; "
+            f"{identity_duplicates} duplicate `(dataset, vid)` identities."
         )
     assets = audit["visual_assets"]
+    image_field_count = len(assets["image_or_frame_fields"])
     lines.extend(
         [
             "",
@@ -145,10 +154,12 @@ def _render_markdown(audit: dict[str, Any]) -> str:
             "",
             f"- Image files under data root: **{assets['images_under_data_root']}**.",
             f"- Image files under repository root: **{assets['images_under_repository_root']}**.",
-            f"- Annotation fields containing image/frame paths: **{len(assets['image_or_frame_fields'])}**.",
+            f"- Annotation fields containing image/frame paths: **{image_field_count}**.",
             f"- Visual manifest ready: **{str(assets['manifest_ready']).lower()}**.",
             "",
-            "The current repository cannot produce a valid visual API manifest: annotations identify timestamps and action segments, but do not identify raw frame files. Supply a source-backed observation index before running `build_manifest.py`.",
+            "The current repository cannot produce a valid visual API manifest: annotations "
+            "identify timestamps and action segments, but do not identify raw frame files. "
+            "Supply a source-backed observation index before running `build_manifest.py`.",
         ]
     )
     return "\n".join(lines) + "\n"

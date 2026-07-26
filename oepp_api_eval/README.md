@@ -23,7 +23,7 @@ Requires Python 3.10+ and [uv](https://docs.astral.sh/uv/):
 
 ```bash
 cd oepp_api_eval
-uv sync
+uv sync --locked
 uv run python src/inspect_data.py --output-dir data_audit
 ```
 
@@ -60,7 +60,7 @@ not silently skipped.
 
 ```bash
 cd oepp_api_eval
-uv sync
+uv sync --locked
 
 uv run python src/extract_tablev_frames.py \
   --sequence-file /data1/wuyilu/OEPP/LLM/T=4_base.json \
@@ -120,7 +120,7 @@ and retains malformed responses as failures.
 
 ## Phase 1: audit and visual manifests
 
-The audit reports files, fields, sample/segment/horizon counts, action-pool integrity, duplicate video identifiers, and frame availability:
+The audit reports files, fields, sample/segment/horizon counts, action-pool integrity, duplicate video identifiers, and frame availability. Its sequence-window counts follow the evaluation protocol: a sequence shorter than $T$ contributes one left-padded window, rather than being excluded. Therefore, the current annotations contain 888 Base and 1,297 Novel $T=4$ windows before the 33 Base windows whose source videos are unavailable are excluded.
 
 ```bash
 uv run python src/inspect_data.py --data-root ../data --output-dir data_audit
