@@ -372,3 +372,13 @@ embedding_results/
 当前结果无需因发现运行错误而重跑。若论文需要“Qwen 与 GPT-4o 的公平比较”或“输出格式可靠”的强结论，必须另做匹配 prompt/image preprocessing 的 GPT 对照、固定 candidate-order 敏感性和随机抽样重复请求；这些应作为新实验版本，不能与本 §12 基线合并。
 
 外部方法依据：[SiliconFlow Vision API](https://docs.siliconflow.com/en/userguide/capabilities/vision)、[SiliconFlow Chat Completions API](https://docs.siliconflow.com/en/api-reference/chat-completions/chat-completions)、[Qwen3-VL-32B-Instruct model card](https://huggingface.co/Qwen/Qwen3-VL-32B-Instruct)。
+
+## 14. OpenRouter Gemini 3.1 Flash Lite 可用性检查
+
+- **模型检索：** `2026-07-26` 使用当前 `OPENROUTER_API_KEY` 查询 `GET https://openrouter.ai/api/v1/models`，账户可见 `google/gemini-3.1-flash-lite`。返回 metadata 声明其为 `text+image+file+audio+video->text`，支持 `temperature`、`max_tokens`、`seed` 与 structured outputs，context 为 1,048,576、最大 completion 为 65,536。该时的 advertised prompt/completion 单价为 `$0.25/$1.50` 每百万 token；image 与 internal reasoning 字段也单独计价，不能把这些价格投影为已有 Qwen run 的实际成本。
+- **安全配置与协议：** 新增的 Base/Novel checked-in config 保持 `api_enabled: false`、`max_calls: 0`，使用现有 split-specific Table V prompt、3+3 JPEG data URLs、原始 action-pool order 和 legacy numbered-action parser。真实 key 只存在环境变量；启用的两份 pilot config 位于 gitignored `private/`。
+- **预算修复：** 原 `run_api.py` 以工作区全局 ledger 长度限制新运行，已有 Qwen 的 2,161 ledger entries 会使小型 Gemini pilot 零调用退出。现在仍保留全局审计 ledger，但仅统计同一 `run_name` 的 attempts；回归测试证明既有 Qwen record 不消耗新 Gemini run 的 `max_calls`。
+- **Base pilot：** 运行 `openrouter-gemini31flashlite-base-pilot-20260726`，使用 `temperature=0`、`max_tokens=512`、无自动 retry、最多 2 calls。两条 Base observation 均在发送六张已 hash 的 JPEG 后返回 HTTP 403：`This model is not available in your region.`；没有 provider completion、usage、parsed prediction 或可报告指标。
+- **停止条件：** 403 为非 retryable provider-availability failure，未重复发送，也没有启动 Novel pilot。该结果仅证明当前 key/region 无法访问这个模型，不能解释为模型质量、视觉能力或格式能力。保持 model ID 不变，等待区域可用性恢复或用户明确选择并批准另一个 account-visible Gemini text-and-image model；不得自动 fallback。
+
+外部接口依据：[OpenRouter API reference](https://openrouter.ai/docs/api-reference/overview)、[OpenRouter models API](https://openrouter.ai/api/v1/models)。

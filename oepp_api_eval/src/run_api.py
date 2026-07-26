@@ -364,7 +364,7 @@ def run(
         if record.get("status") == "success"
     }
     saved_request_ids = {record["sample_id"] for record in load_jsonl(requests_path)}
-    call_count = len(load_jsonl(ledger_path))
+    call_count = sum(1 for record in load_jsonl(ledger_path) if record.get("run_name") == run_name)
     attempted_samples = 0
     completed_samples = 0
 
