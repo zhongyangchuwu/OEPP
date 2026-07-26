@@ -16,6 +16,7 @@ class ParseResult:
     status: str
     actions: list[int] | None
     error: str | None
+    action_texts: list[str] | None = None
 
 
 def _json_candidates(content: str) -> Iterable[Any]:
@@ -76,9 +77,9 @@ def _candidate_name_ids(candidates: list[dict[str, Any]]) -> dict[str, int]:
         if not isinstance(action, str):
             raise ValueError("candidate action text must be a string")
         key = _legacy_action_key(action)
-        if not key or key in names:
-            raise ValueError("candidate actions must have unique normalized names")
-        names[key] = identifier
+        if not key:
+            raise ValueError("candidate action text must not normalize to empty")
+        names.setdefault(key, identifier)
     return names
 
 
@@ -93,7 +94,7 @@ def parse_numbered_action_names(
         return ParseResult(
             "parse_failure", None, f"expected {horizon} numbered actions, received {len(lines)}"
         )
-    actions: list[int] = []
+    action_texts: list[str] = []
     for expected_index, line in enumerate(lines, start=1):
         match = re.fullmatch(r"(?P<index>[1-9]\d*)\.\s+(?P<action>.+?)\s*", line)
         if match is None:
@@ -102,15 +103,19 @@ def parse_numbered_action_names(
             )
         if int(match.group("index")) != expected_index:
             return ParseResult("parse_failure", None, f"expected action number {expected_index}")
-        action_id = action_ids.get(_legacy_action_key(match.group("action")))
+        action_texts.append(match.group("action"))
+    actions: list[int] = []
+    for action_text in action_texts:
+        action_id = action_ids.get(_legacy_action_key(action_text))
         if action_id is None:
             return ParseResult(
                 "parse_failure",
                 None,
-                f"action is not in the candidate pool: {match.group('action')}",
+                f"action is not in the candidate pool: {action_text}",
+                action_texts,
             )
         actions.append(action_id)
-    return ParseResult("ok", actions, None)
+    return ParseResult("ok", actions, None, action_texts)
 
 
 def parse_response(
@@ -153,6 +158,7 @@ def main() -> None:
                 "status": response.get("status"),
                 "parse_status": result.status,
                 "action_ids": result.actions,
+                "action_texts": result.action_texts,
                 "parse_error": result.error,
             }
         )

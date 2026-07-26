@@ -60,6 +60,34 @@ class TableVManifestTests(unittest.TestCase):
         self.assertEqual(manifest[0]["gt_action_ids"], [0, 1, 2, 3])
         self.assertEqual(manifest[0]["response_parser"], LEGACY_NUMBERED_ACTION_NAMES)
 
+    def test_preserves_whitespace_only_candidate_aliases(self) -> None:
+        self.actions = [
+            "make the detergent",
+            "make the  detergent",
+            "third action",
+            "fourth action",
+        ]
+        self.record["anno"] = [
+            {"action": action, "segment": [index * 10.0, index * 10.0 + 9.0]}
+            for index, action in enumerate(self.actions)
+        ]
+        observation = self._observation()
+        pool = ["make the detergent", "make the  detergent", "third action", "fourth action"]
+        with tempfile.TemporaryDirectory() as temporary:
+            frame_root = Path(temporary)
+            for relative_path in [*observation["start_images"], *observation["end_images"]]:
+                path = frame_root / relative_path
+                path.parent.mkdir(parents=True, exist_ok=True)
+                Image.new("RGB", (8, 8), color="blue").save(path)
+            manifest = build_manifest([observation], [self.record], pool, frame_root, "base")
+        self.assertEqual(
+            [candidate["text"] for candidate in manifest[0]["candidate_actions"]], pool
+        )
+        self.assertEqual(manifest[0]["gt_action_ids"], [0, 1, 2, 3])
+        self.assertEqual(manifest[0]["gt_actions"], self.actions)
+        self.assertEqual(manifest[0]["candidate_pool_source_size"], 4)
+        self.assertEqual(manifest[0]["candidate_pool_effective_size"], 4)
+
     def test_records_missing_source_video_without_importing_opencv(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -85,6 +113,18 @@ class TableVManifestTests(unittest.TestCase):
 
 
 class TableVRequestTests(unittest.TestCase):
+    def test_split_prompts_preserve_historical_repetition_difference(self) -> None:
+        prompt_root = Path(__file__).resolve().parents[1] / "configs" / "prompts"
+        base_prompt = json.loads(
+            (prompt_root / "tablev_t4_3x3_legacy_base_v2.json").read_text(encoding="utf-8")
+        )
+        novel_prompt = json.loads(
+            (prompt_root / "tablev_t4_3x3_legacy_novel_v2.json").read_text(encoding="utf-8")
+        )
+        self.assertIn("repeating the first action", base_prompt["user_start"])
+        self.assertNotIn("repeating the first action", novel_prompt["user_start"])
+        self.assertEqual(base_prompt["system_messages"], novel_prompt["system_messages"])
+
     def test_places_three_start_images_before_three_goal_images(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -111,22 +151,30 @@ class TableVRequestTests(unittest.TestCase):
                     "system_messages": ["Choose from: {candidate_action_list}"],
                     "user_start": "T is {T}; start.",
                     "user_end": "goal.",
+                    "user_output": "Return exactly {T} lines.",
                 }
             )
             messages, metadata = _prepare_request(
                 sample, template, TABLE_V_LEGACY_PROMPT_MODE, LEGACY_NUMBERED_ACTION_NAMES
             )
+        self.assertEqual(messages[0]["content"], "Choose from: first action,second action")
         self.assertEqual([message["role"] for message in messages], ["system", "user"])
         user_content = messages[-1]["content"]
         image_positions = [
             index for index, item in enumerate(user_content) if item["type"] == "image_url"
         ]
         self.assertEqual(len(image_positions), 6)
+        self.assertEqual(
+            {user_content[index]["image_url"]["detail"] for index in image_positions}, {"auto"}
+        )
         self.assertLess(
             image_positions[2],
             next(index for index, item in enumerate(user_content) if item.get("text") == "goal."),
         )
+        self.assertEqual(user_content[-1], {"type": "text", "text": "Return exactly 4 lines."})
+        self.assertEqual(metadata["system_message_count"], 1)
         self.assertEqual(metadata["response_parser"], LEGACY_NUMBERED_ACTION_NAMES)
+        self.assertEqual(metadata["image_detail"], "auto")
 
 
 if __name__ == "__main__":

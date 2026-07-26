@@ -1,0 +1,10 @@
+{
+  "system_messages": [
+    "You are a helpful assistant, an expert in answering questions about action planning in instructional videos. Based on the start images and end images, you need to infer the actions to transform from the start images to the end images.",
+    "You must choose from the following actions: {candidate_action_list}",
+    "Output the name of the actions step by step. Images and other files are not allowed in the output. Only the action sequence is allowed to be output. Example: 1. cut in half 2. slice the pulp Example: 1. dip detergent with rag or apply detergent 2. clean the floor 3. wash the floor Ensure all letters in the actions are lowercase, and make sure the action name is not bold."
+  ],
+  "user_start": "Infer the actions to transform from the start images to the end images. The actions must be actions from the given action pool. The number of actions is {T}. The start images:",
+  "user_end": "The end images:",
+  "user_output": "Return exactly {T} lines after the images. Each line must be exactly '<number>. <action name>' with numbers 1 through {T} in order. Copy every action name from the supplied action pool exactly. Do not explain, describe images, make assumptions, use Markdown, or output any other text."
+}

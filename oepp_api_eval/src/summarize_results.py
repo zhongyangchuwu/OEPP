@@ -14,10 +14,15 @@ def _row(name: str, metrics: dict[str, Any]) -> str:
 
 
 def render(metrics: dict[str, Any]) -> str:
+    scoring_mode = metrics.get("scoring_mode", "strict")
+    strict_failures = metrics["parse_or_missing_failures"]
+    total_samples = metrics["overall"]["samples"]
+    strict_failure_rate = metrics["parse_or_missing_failure_rate"]
     lines = [
         "# OEPP API Evaluation Summary",
         "",
         f"Generated: `{metrics['generated_at']}`",
+        f"Scoring mode: `{scoring_mode}`",
         "",
         "## Overall",
         "",
@@ -42,12 +47,24 @@ def render(metrics: dict[str, Any]) -> str:
             "",
             "## Failures",
             "",
-            f"- Parse or missing-prediction failures: **{metrics['parse_or_missing_failures']}** / "
-            f"**{metrics['overall']['samples']}** ({metrics['parse_or_missing_failure_rate']:.2f}%).",
-            "",
-            "Failures remain in every denominator. This summary does not repair, omit, or substitute model outputs.",
+            f"- Strict parser or missing-prediction failures: **{strict_failures}** / "
+            f"**{total_samples}** ({strict_failure_rate:.2f}%).",
         ]
     )
+    if scoring_mode == "paper_compatible":
+        lines.extend(
+            [
+                f"- Structurally valid raw-action sequences scored by the paper-compatible "
+                f"rule: **{metrics['paper_compatible_raw_action_sequences']}**.",
+                "- Every sample remains in the denominator. Formatted out-of-pool action names "
+                "retain position-wise/set credit under the historical Table V scoring rule.",
+            ]
+        )
+    else:
+        lines.append(
+            "- Failures remain in every denominator and receive zero score; this summary does not "
+            "repair, omit, or substitute model outputs."
+        )
     return "\n".join(lines) + "\n"
 
 

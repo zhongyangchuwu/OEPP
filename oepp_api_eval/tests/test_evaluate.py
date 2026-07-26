@@ -64,6 +64,25 @@ class EvaluateTests(unittest.TestCase):
         self.assertEqual(rows[0]["acc"], 1 / 3)
         self.assertEqual(rows[0]["iou"], 100.0)
 
+    def test_paper_compatible_scoring_preserves_partial_out_of_pool_credit(self) -> None:
+        prediction = {
+            "sample_id": "sample-1",
+            "parse_status": "parse_failure",
+            "action_ids": None,
+            "action_texts": [" First ", "outside candidate", "third"],
+        }
+        strict_rows, strict_report = evaluate(self.manifest[:1], [prediction])
+        compatible_rows, compatible_report = evaluate(
+            self.manifest[:1], [prediction], "paper_compatible"
+        )
+        self.assertEqual(strict_rows[0]["acc"], 0.0)
+        self.assertEqual(strict_rows[0]["iou"], 0.0)
+        self.assertAlmostEqual(compatible_rows[0]["acc"], 2 / 3)
+        self.assertEqual(compatible_rows[0]["iou"], 50.0)
+        self.assertTrue(compatible_rows[0]["scored_from_raw_action_texts"])
+        self.assertEqual(compatible_report["paper_compatible_raw_action_sequences"], 1)
+        self.assertEqual(strict_report["parse_or_missing_failures"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

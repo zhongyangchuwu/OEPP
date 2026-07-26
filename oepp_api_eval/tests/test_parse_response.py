@@ -41,6 +41,7 @@ class ParseActionsTests(unittest.TestCase):
         )
         self.assertEqual(result.status, "ok")
         self.assertEqual(result.actions, [0, 1, 2])
+        self.assertEqual(result.action_texts, ["Cut  in half", "clean the floor", "wash the floor"])
 
     def test_rejects_unknown_legacy_action_without_substitution(self) -> None:
         candidates = [
@@ -54,6 +55,28 @@ class ParseActionsTests(unittest.TestCase):
         self.assertEqual(result.status, "parse_failure")
         self.assertIsNone(result.actions)
         self.assertIn("not in the candidate pool", result.error)
+
+    def test_preserves_formatted_out_of_pool_actions_for_compatible_scoring(self) -> None:
+        candidates = [
+            {"id": 0, "text": "cut in half"},
+            {"id": 1, "text": "clean the floor"},
+            {"id": 2, "text": "wash the floor"},
+        ]
+        result = parse_numbered_action_names(
+            "1. cut in half\n2. clean the room\n3. wash the floor", 3, candidates
+        )
+        self.assertEqual(result.status, "parse_failure")
+        self.assertIsNone(result.actions)
+        self.assertEqual(result.action_texts, ["cut in half", "clean the room", "wash the floor"])
+
+    def test_accepts_whitespace_only_candidate_aliases(self) -> None:
+        candidates = [
+            {"id": 0, "text": "make the detergent"},
+            {"id": 1, "text": "make the  detergent"},
+        ]
+        result = parse_numbered_action_names("1. make the detergent", 1, candidates)
+        self.assertEqual(result.status, "ok")
+        self.assertEqual(result.actions, [0])
 
 
 if __name__ == "__main__":

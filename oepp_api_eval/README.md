@@ -4,7 +4,7 @@ Independent, remote-API-only evaluation for the OEPP paper. It reads `../data/` 
 
 ## Current state
 
-`python src/inspect_data.py` reproduces the paper's Table II counts from the local annotations. The checkout has **no raw test videos or frame files**: `dataset/dataset.py` consumes precomputed `.npy` features from external absolute paths, while the JSON annotations only provide segment timestamps. Therefore, a visual manifest and every API call are intentionally blocked until a verified observation index maps each annotated sequence window to real local frames.
+`python src/inspect_data.py` reproduces the paper's Table II counts from local annotations. Raw MP4 videos remain server-only, but the verified Table V 3+3 frame sets and observation indices are now local: 855 Base observations (33 missing-video windows excluded) and 1,297 Novel observations. Checked-in configurations remain offline until an approved private copy is used.
 
 The checked-in Qwen configuration is Phase 1 safe:
 
@@ -14,6 +14,8 @@ max_calls: 0
 ```
 
 No command in this project can issue an API request in that state.
+
+中文任务进展、服务器提帧结果和问题记录见 [REPORT.md](REPORT.md)。
 
 ## Environment
 
@@ -25,23 +27,22 @@ uv sync
 uv run python src/inspect_data.py --output-dir data_audit
 ```
 
-Create an ignored `.env` from `.env.example`; keep model ID and endpoint configurable because availability depends on the Model Studio account and region:
+Create an ignored `.env` from `.env.example`. The active SiliconFlow Qwen3-VL configuration reads the key only from the shell and stores endpoint/model selection separately:
 
 ```dotenv
-DASHSCOPE_API_KEY=
-QWEN_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
-QWEN_MODEL=qwen3-vl-235b-a22b-instruct
+SILICONFLOW_BASE_URL=https://api.siliconflow.cn/v1
+SILICONFLOW_QWEN_MODEL=Qwen/Qwen3-VL-32B-Instruct
 ```
 
-`DASHSCOPE_API_KEY` is never read into a config snapshot, a log, or a JSONL artifact.
+Export `SILICONFLOW_API_KEY` in the same shell. The key is never read into a config snapshot, a log, or a JSONL artifact.
 
 ## Table V T=4, 3+3 API protocol
 
 The primary reviewer baseline uses the final GPT row's observation protocol: a four-action
 window, three start frames at `start_f + [0, 1, 2]`, three goal frames at
-`end_f + [-2, -1, 0]`, and split-specific action pools. The Table V source manifests and
-raw MP4 videos live on the server, not in this repository. The checked-in Table V Qwen
-configuration remains disabled and uses the legacy numbered-action response parser:
+`end_f + [-2, -1, 0]`, and split-specific action pools. Raw MP4 videos live on the server,
+while local frame/observation artifacts are sufficient for API inference. The checked-in
+SiliconFlow Table V configuration remains disabled and uses the legacy numbered-action response parser:
 
 ```yaml
 experiment:
@@ -95,22 +96,27 @@ uv run python src/build_tablev_manifest.py \
   --output manifests/tablev_t4_3x3/base_manifest.jsonl
 ```
 
-Repeat with `--split novel` and `novel_observations.jsonl`. Create a private configuration
-copy from `configs/qwen3vl_tablev_t4_3x3.yaml`; only that private copy may set
-`api_enabled: true` and a reviewed call limit. It uses the exact provider model ID from
-`QWEN_MODEL`, saves raw responses and usage, and leaves malformed action names as failures.
+Build the Novel manifest with `--split novel` and `novel_observations.jsonl`. The public
+SiliconFlow configurations lock each historical prompt variant to its intended split; copy the
+matching configuration privately before enabling API calls:
 
 ```bash
 mkdir -p private
-cp configs/qwen3vl_tablev_t4_3x3.yaml private/qwen3vl_tablev_t4_3x3.yaml
+cp configs/siliconflow_qwen3vl32_tablev_t4_3x3.yaml private/qwen3vl32_tablev_t4_3x3_base.yaml
+cp configs/siliconflow_qwen3vl32_tablev_t4_3x3_novel.yaml private/qwen3vl32_tablev_t4_3x3_novel.yaml
+
 uv run python src/run_api.py \
-  --config private/qwen3vl_tablev_t4_3x3.yaml \
+  --config private/qwen3vl32_tablev_t4_3x3_base.yaml \
   --manifest manifests/tablev_t4_3x3/base_manifest.jsonl \
-  --run-name qwen-tablev-t4-3x3-base
+  --run-name siliconflow-qwen3vl32-base
+uv run python src/run_api.py \
+  --config private/qwen3vl32_tablev_t4_3x3_novel.yaml \
+  --manifest manifests/tablev_t4_3x3/novel_manifest.jsonl \
+  --run-name siliconflow-qwen3vl32-novel
 ```
 
-Run `evaluate.py` and `summarize_results.py` separately for Base and Novel. Do not aggregate
-the two runs until their protocol, model ID, prompt version, and candidate-order metadata match.
+The runner records raw responses and action text, rejects a manifest for the wrong configured split,
+and retains malformed responses as failures.
 
 ## Phase 1: audit and visual manifests
 
@@ -134,7 +140,7 @@ Supply a JSONL observation index only after extracting frames from an identified
 }
 ```
 
-For `3+3`, each image list contains exactly three paths. The builder checks all files with Pillow, preserves original action text, assigns sequential IDs, and rejects any missing or ambiguous observation. The faithful primary protocol preserves the action-list file order; seeded shuffles are separate candidate-order sensitivity runs.
+For `3+3`, each image list contains exactly three paths. The builder checks all files with Pillow and preserves the source action-pool text and order, including whitespace-only aliases. Action-name matching during parsing/scoring is case- and whitespace-insensitive, matching the historical Table V evaluator; seeded shuffles are separate candidate-order sensitivity runs.
 
 ```bash
 uv run python src/build_manifest.py \
@@ -173,17 +179,30 @@ The runner requires a reviewed approval JSON for any limit over ten. The pilot c
 
 ## Evaluation
 
+For the primary Table V comparison, use `paper_compatible`: formatted four-action responses are
+normalized by case/whitespace and receive the same action-wise and set-IoU treatment as the historical
+notebook, even when an action is outside the candidate pool. Keep `strict` as the complementary format
+and candidate-compliance report. API failures, missing predictions, and structurally invalid responses
+remain zero-score denominator entries in both modes.
+
 ```bash
 uv run python src/evaluate.py \
-  --manifest manifests/pilot.jsonl \
-  --predictions runs/pilot-qwen3vl/predictions.jsonl \
-  --output runs/pilot-qwen3vl/metrics.json
+  --manifest manifests/tablev_t4_3x3/base_manifest.jsonl \
+  --predictions runs/siliconflow-qwen3vl32-base/predictions.jsonl \
+  --scoring-mode paper_compatible \
+  --output runs/siliconflow-qwen3vl32-base/metrics_paper_compatible.json
+uv run python src/evaluate.py \
+  --manifest manifests/tablev_t4_3x3/base_manifest.jsonl \
+  --predictions runs/siliconflow-qwen3vl32-base/predictions.jsonl \
+  --scoring-mode strict \
+  --output runs/siliconflow-qwen3vl32-base/metrics_strict.json
 uv run python src/summarize_results.py \
-  --metrics runs/pilot-qwen3vl/metrics.json \
-  --output runs/pilot-qwen3vl/summary.md
+  --metrics runs/siliconflow-qwen3vl32-base/metrics_paper_compatible.json \
+  --output runs/siliconflow-qwen3vl32-base/summary_paper_compatible.md
 ```
 
-Metrics match OEPP semantics: SR is exact sequence match, Acc is position-wise accuracy, and mIoU is set IoU. Missing, malformed, and out-of-pool model outputs stay in the denominator as zero-score failures; they are never padded, truncated, reordered, or semantically replaced.
+Repeat separately for Novel. Never aggregate Base and Novel, generic, legacy, distinct prompt versions,
+or distinct scoring modes.
 
 ## Sources
 

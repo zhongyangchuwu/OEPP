@@ -28,6 +28,7 @@ RETRYABLE_EXCEPTION_NAMES = {"APIConnectionError", "APITimeoutError", "TimeoutEx
 GENERIC_PROMPT_MODE = "candidate_ids_json"
 TABLE_V_LEGACY_PROMPT_MODE = "table_v_legacy"
 PROMPT_MODES = frozenset({GENERIC_PROMPT_MODE, TABLE_V_LEGACY_PROMPT_MODE})
+IMAGE_DETAILS = frozenset({"auto", "low", "high"})
 
 
 def _mapping(value: Any, name: str) -> dict[str, Any]:
@@ -113,6 +114,14 @@ def _prompt_path(config: dict[str, Any]) -> tuple[str, Path, str]:
     return version, path, mode
 
 
+def _image_detail(request_config: dict[str, Any]) -> str:
+    image_detail = request_config.get("image_detail", "auto")
+    if image_detail not in IMAGE_DETAILS:
+        choices = ", ".join(sorted(IMAGE_DETAILS))
+        raise ValueError(f"request.image_detail must be one of: {choices}.")
+    return image_detail
+
+
 def _mime_type(path: Path) -> str:
     mime_type, _ = mimetypes.guess_type(path.name)
     if mime_type not in {"image/jpeg", "image/png", "image/webp", "image/gif", "image/bmp"}:
@@ -120,7 +129,7 @@ def _mime_type(path: Path) -> str:
     return mime_type
 
 
-def _image_content(path_text: str) -> tuple[dict[str, Any], dict[str, Any]]:
+def _image_content(path_text: str, image_detail: str) -> tuple[dict[str, Any], dict[str, Any]]:
     path = Path(path_text)
     if not path.is_file():
         raise FileNotFoundError(f"Manifest image does not exist: {path}")
@@ -134,7 +143,7 @@ def _image_content(path_text: str) -> tuple[dict[str, Any], dict[str, Any]]:
     }
     return {
         "type": "image_url",
-        "image_url": {"url": f"data:{mime_type};base64,{encoded}"},
+        "image_url": {"url": f"data:{mime_type};base64,{encoded}", "detail": image_detail},
     }, descriptor
 
 
@@ -155,7 +164,7 @@ def _candidate_actions(sample: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _image_content_groups(
-    sample: dict[str, Any], labelled: bool
+    sample: dict[str, Any], labelled: bool, image_detail: str
 ) -> tuple[list[dict[str, Any]], dict[str, list[dict[str, Any]]]]:
     content: list[dict[str, Any]] = []
     descriptors: dict[str, list[dict[str, Any]]] = {"start": [], "goal": []}
@@ -164,7 +173,7 @@ def _image_content_groups(
         if not isinstance(images, list) or not all(isinstance(image, str) for image in images):
             raise ValueError(f"{sample.get('sample_id')} has invalid {key}")
         for index, image in enumerate(images, start=1):
-            image_content, descriptor = _image_content(image)
+            image_content, descriptor = _image_content(image, image_detail)
             if labelled:
                 content.append({"type": "text", "text": f"{label} image {index}"})
             content.append(image_content)
@@ -172,7 +181,9 @@ def _image_content_groups(
     return content, descriptors
 
 
-def _legacy_prompt(template: str, candidate_text: str, horizon: int) -> tuple[list[str], str, str]:
+def _legacy_prompt(
+    template: str, candidate_text: str, horizon: int
+) -> tuple[list[str], str, str, str]:
     try:
         prompt = json.loads(template)
     except json.JSONDecodeError as error:
@@ -180,57 +191,73 @@ def _legacy_prompt(template: str, candidate_text: str, horizon: int) -> tuple[li
     system_messages = prompt.get("system_messages")
     user_start = prompt.get("user_start")
     user_end = prompt.get("user_end")
+    user_output = prompt.get("user_output", "")
     if (
         not isinstance(system_messages, list)
         or not all(isinstance(message, str) for message in system_messages)
         or not isinstance(user_start, str)
         or not isinstance(user_end, str)
+        or not isinstance(user_output, str)
     ):
         raise ValueError(
-            "table_v_legacy prompt needs string system_messages, user_start, and user_end"
+            "table_v_legacy prompt needs string system_messages, user_start, user_end, "
+            "and user_output"
         )
     variables = {"T": horizon, "candidate_action_list": candidate_text}
     return (
         [message.format(**variables) for message in system_messages],
         user_start.format(**variables),
         user_end.format(**variables),
+        user_output.format(**variables),
     )
 
 
 def _prepare_request(
-    sample: dict[str, Any], prompt_template: str, prompt_mode: str, response_parser: str
+    sample: dict[str, Any],
+    prompt_template: str,
+    prompt_mode: str,
+    response_parser: str,
+    image_detail: str = "auto",
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     candidates = _candidate_actions(sample)
+    system_message_count = 0
     if prompt_mode == GENERIC_PROMPT_MODE:
         candidate_text = "\n".join(
             f"{candidate['id']}: {candidate['text']}" for candidate in candidates
         )
         text = prompt_template.format(T=sample["T"], candidate_action_list=candidate_text)
-        content, descriptors = _image_content_groups(sample, labelled=True)
+        content, descriptors = _image_content_groups(
+            sample, labelled=True, image_detail=image_detail
+        )
         content.append({"type": "text", "text": text})
         messages = [{"role": "user", "content": content}]
     else:
         candidate_text = ",".join(candidate["text"] for candidate in candidates)
-        system_messages, user_start, user_end = _legacy_prompt(
+        system_messages, user_start, user_end, user_output = _legacy_prompt(
             prompt_template, candidate_text, sample["T"]
         )
+        system_message_count = 1
         start_content, descriptors = _image_content_groups(
-            {**sample, "end_images": []}, labelled=False
+            {**sample, "end_images": []}, labelled=False, image_detail=image_detail
         )
         end_content, end_descriptors = _image_content_groups(
-            {**sample, "start_images": []}, labelled=False
+            {**sample, "start_images": []}, labelled=False, image_detail=image_detail
         )
         descriptors["goal"] = end_descriptors["goal"]
         content = [{"type": "text", "text": user_start}, *start_content]
         content.extend([{"type": "text", "text": user_end}, *end_content])
+        if user_output:
+            content.append({"type": "text", "text": user_output})
         messages = [
-            *({"role": "system", "content": message} for message in system_messages),
+            {"role": "system", "content": "\n\n".join(system_messages)},
             {"role": "user", "content": content},
         ]
     metadata = {
         "sample_id": sample["sample_id"],
         "image_setting": sample["image_setting"],
         "image_transport": "data_url",
+        "image_detail": image_detail,
+        "system_message_count": system_message_count,
         "start_images": descriptors["start"],
         "goal_images": descriptors["goal"],
         "candidate_count": len(candidates),
@@ -270,6 +297,7 @@ def _response_parser(config: dict[str, Any]) -> str:
 
 
 def _safe_config_snapshot(config: dict[str, Any], model: str, base_url: str) -> dict[str, Any]:
+    experiment = _mapping(config.get("experiment"), "experiment")
     request = _mapping(config.get("request"), "request")
     prompt_version, prompt_path, prompt_mode = _prompt_path(config)
     return {
@@ -277,17 +305,24 @@ def _safe_config_snapshot(config: dict[str, Any], model: str, base_url: str) -> 
         "model": model,
         "endpoint": endpoint_identity(base_url),
         "request": request,
+        "experiment": {"expected_split": experiment.get("expected_split")},
         "response_parser": _response_parser(config),
         "prompt": {"version": prompt_version, "path": str(prompt_path), "mode": prompt_mode},
     }
 
 
-def _validate_manifest(manifest: list[dict[str, Any]]) -> None:
+def _validate_manifest(manifest: list[dict[str, Any]], expected_split: str | None = None) -> None:
     sample_ids = [sample.get("sample_id") for sample in manifest]
     if not all(isinstance(sample_id, str) and sample_id for sample_id in sample_ids):
         raise ValueError("Every manifest record needs a non-empty sample_id.")
     if len(sample_ids) != len(set(sample_ids)):
         raise ValueError("Manifest sample_id values must be unique.")
+    if expected_split is None:
+        return
+    if expected_split not in {"base", "novel"}:
+        raise ValueError("experiment.expected_split must be 'base' or 'novel'.")
+    if any(sample.get("split") != expected_split for sample in manifest):
+        raise ValueError(f"Manifest does not contain only the expected {expected_split} split.")
 
 
 def run(
@@ -296,7 +331,7 @@ def run(
     if Path(run_name).name != run_name or run_name in {"", ".", ".."}:
         raise ValueError("--run-name must be a single directory name.")
     config = load_yaml(config_path)
-    _, call_limit = _config_limit(config, requested_limit)
+    experiment, call_limit = _config_limit(config, requested_limit)
     model_config = _mapping(config.get("model"), "model")
     request_config = _mapping(config.get("request"), "request")
     if request_config.get("concurrency") != 1:
@@ -308,12 +343,13 @@ def run(
     if not isinstance(backoff, (int, float)) or backoff <= 0:
         raise ValueError("request.backoff_seconds must be a positive number.")
     backoff_seconds = float(backoff)
+    image_detail = _image_detail(request_config)
     api_key, base_url, model = _load_environment(model_config)
     prompt_version, prompt_path, prompt_mode = _prompt_path(config)
     response_parser = _response_parser(config)
     prompt_template = prompt_path.read_text(encoding="utf-8")
     manifest = load_jsonl(manifest_path)
-    _validate_manifest(manifest)
+    _validate_manifest(manifest, experiment.get("expected_split"))
     run_dir = EXPERIMENT_ROOT / "runs" / run_name
     run_dir.mkdir(parents=True, exist_ok=True)
     write_json(run_dir / "config.json", _safe_config_snapshot(config, model, base_url))
@@ -350,7 +386,7 @@ def run(
             break
         try:
             messages, request_metadata = _prepare_request(
-                sample, prompt_template, prompt_mode, response_parser
+                sample, prompt_template, prompt_mode, response_parser, image_detail
             )
         except Exception as error:
             failure = {
@@ -422,6 +458,7 @@ def run(
                     "raw_api_response": _serialized(completion),
                     "parse_status": parsed.status,
                     "parse_error": parsed.error,
+                    "parsed_action_texts": parsed.action_texts,
                 }
                 append_jsonl(responses_path, response_record)
                 append_jsonl(
@@ -431,6 +468,7 @@ def run(
                         "status": "success",
                         "parse_status": parsed.status,
                         "action_ids": parsed.actions,
+                        "action_texts": parsed.action_texts,
                         "parse_error": parsed.error,
                     },
                 )

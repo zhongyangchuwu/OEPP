@@ -19,6 +19,10 @@ POOL_FILES = {
 }
 
 
+def _action_key(action: str) -> str:
+    return "".join(action.casefold().split())
+
+
 def _window_key(
     vid: str, start: float, end: float, actions: list[str]
 ) -> tuple[str, float, float, tuple[str, ...]]:
@@ -182,6 +186,9 @@ def build_manifest(
                 "pool_type": "split",
                 "candidate_order": "original_file_order",
                 "candidate_order_seed": None,
+                "candidate_pool_source_size": len(action_pool),
+                "candidate_pool_effective_size": len(candidates),
+                "candidate_name_normalization": "casefold_whitespace_for_matching",
                 "protocol": PROTOCOL_ID,
                 "response_parser": "legacy_numbered_action_names",
                 "source_sequence_index": observation["sequence_index"],
