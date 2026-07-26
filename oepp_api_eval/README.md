@@ -15,7 +15,7 @@ max_calls: 0
 
 No command in this project can issue an API request in that state.
 
-中文任务进展、服务器提帧结果和问题记录见 [REPORT.md](REPORT.md)。
+中文任务进展、服务器提帧结果和问题记录保存在当前 workspace 的 `REPORT.md`，不随仓库提交。
 
 ## Environment
 
