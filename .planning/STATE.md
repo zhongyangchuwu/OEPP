@@ -17,9 +17,9 @@ See: `.planning/PROJECT.md` (updated 2026-07-22)
 
 ## Current Position
 
-Phase: Experiment 4 embedding-analysis implementation  
-Status: Fresh MLP, Transformer, and PDPP checkpoint/export paths are implemented locally. The validated 2,771-member VideoCLIP archive is ready to extract under `features/OEPP_videoclip`; all loaders resolve this location or the `OEPP_VIDEOCLIP_ROOT` override. Runtime validation and server execution remain blocked on an SSH host, CUDA runtime, and transferring the archive to `/data1/wuyilu/OEPP-hjr`.
-Last activity: 2026-07-26 — validated the VideoCLIP archive against every annotation, removed the machine-specific VideoCLIP mount requirement, and added one root uv project with CPU/CUDA extras.
+Phase: Experiment 4 embedding-analysis execution complete; scientific interpretation and optional local artifact retrieval remain.
+Status: Server preflight, fresh 200-epoch MLP/Transformer/PDPP runs, validation-selected checkpoints, Base/Novel exports, all pre-specified figures, and seeded PDPP repeat-export verification are complete. Canonical artifacts remain on the server because WSL rsync transfer was deferred after a stalled partial download.
+Last activity: 2026-07-26 — audited all three final server-side model artifacts. PDPP selected epoch 168 of 200 by validation SR/Acc; repeat export with seed 42 produced equal Base/Novel raw tensors.
 
 ## Accumulated Context
 
@@ -57,7 +57,7 @@ Last activity: 2026-07-26 — validated the VideoCLIP archive against every anno
 - **MLLM result scope:** Table V Qwen results are now scored and documented. Keep Base/Novel, prompt version, candidate order, and `paper_compatible`/`strict` metrics separate in all later analyses; raw requests, responses, predictions, ledger, and per-sample scores are retained under `oepp_api_eval/runs/`.
 - **Full-run verification:** all 2,152 samples have provider responses and strict/paper-compatible metric files; the only outstanding MLLM cost caveat is that the user-supplied estimate is not a provider price record.
 - **Publication caveat:** model alias/revision, `image_detail=auto` preprocessing, unset provider sampling defaults, one candidate order, one API sweep, and opaque training data prevent a fully controlled architecture comparison. State these limitations beside any Qwen/GPT comparison; do not present them as hidden nuisance errors.
-- **Embedding execution blocker:** the 2,771-file VideoCLIP archive is locally available and exactly matches the annotations, but no SSH host is configured to transfer it to `/data1/wuyilu/OEPP-hjr`. Once uploaded under `features/OEPP_videoclip`, run default server preflight, the server test suite, a 10-epoch calibration, then fresh model runs.
+- **Embedding follow-up:** all planned server-side execution and artifact checks are complete. Before scientific claims, review all pre-specified figures and summaries without cherry-picking; archive/download the three complete server export directories using a resumable single-file transfer when local analysis is needed.
 
 ## Session Continuity
 

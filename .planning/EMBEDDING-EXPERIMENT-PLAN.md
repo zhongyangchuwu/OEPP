@@ -18,6 +18,14 @@ This experiment starts from fresh initialization. Do not load historical Transfo
 - No valid local checkpoint exists. The local environment has neither Torch nor a CUDA device; `/data0` and `/data1` are not mounted. No SSH experiment host is configured in this harness. The experiment must not start until a server host/access path is supplied and preflight succeeds.
 - For `T=3`, `is_pad=1`, the current annotations generate 3,550 train, 883 validation, 1,138 Base-test, and 1,691 Novel-test windows. Base and Novel exports contain 2,829 windows / 8,487 step embeddings. Saving float32 predicted and GT tensors requires about 49.73 MiB before metadata and plots.
 
+## Execution evidence — 2026-07-26
+
+- Server preflight passed with CUDA-enabled PyTorch 2.3.0+cu118 and all 2,771 VideoCLIP arrays present, valid, and matched to the annotations.
+- Fresh 200-epoch direct runs completed under `results/experiment4/attention_t3_seed42_run1/` and `results/experiment4/mlp_t3_seed42_run1/`. Validation selected Transformer epoch 152 (`SR=25.82%`, `Acc=55.61%`, `mIoU=59.48%`) and MLP epoch 145 (`SR=27.63%`, `Acc=56.21%`, `mIoU=61.14%`); neither selection used Base or Novel test data.
+- Fresh 200-epoch PDPP completed under `results/experiment4/pdpp_checkpoints/pdpp_t3_seed42_run1/`; `best.pt` is epoch 168 (`SR=30.58%`, `Acc=56.93%`, `mIoU1=68.80%`) while `last.pt` is epoch 200. The export uses the selected EMA checkpoint, not `last.pt`.
+- Final server-side exports exist at `embedding_results/{attention_t3_seed42_run1,mlp_t3_seed42_run1,pdpp_t3_seed42_run1}/`. Every model has Base `(1138, 3, 768)`, Novel `(1691, 3, 768)`, 3,414 / 5,073 step rows, summaries, and all seven pre-specified figures.
+- Repeating the final PDPP export with `sampling_seed=42` produced bitwise-equal Base and Novel predicted/GT raw tensors. Local artifact download is intentionally deferred after WSL rsync stalled; server artifacts are canonical until a resumable archive transfer is prepared.
+
 ## Required implementation
 
 ### 1. Reproducible training and checkpointing
