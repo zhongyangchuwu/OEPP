@@ -39,4 +39,4 @@ The non-thinking 2 Base + 2 Novel pilot satisfied the transport/format gate. The
 
 ## P3IV and KEPP feasibility record
 
-The static upstream audit is recorded in `.planning/P3IV-KEPP-FEASIBILITY.md`. KEPP has compatible CrossTask/COIN lineage but requires a train-only knowledge-graph pipeline and verified feature/action adapters. P3IV hard-codes a 512-D S3D + 128-D audio input and 106-way CrossTask action head, so an OEPP result requires an explicitly named adapter and cannot be represented as an unmodified upstream run. No valid training result exists while server feature provenance is unavailable.
+The static upstream audit is recorded in `.planning/P3IV-KEPP-FEASIBILITY.md`. KEPP has compatible CrossTask/COIN lineage but requires a train-only knowledge-graph pipeline and verified feature/action adapters. P3IV hard-codes a 512-D S3D + 128-D audio input and 106-way CrossTask action head, so an OEPP result requires an explicitly named adapter and cannot be represented as an unmodified upstream run. The server is accessible; adapter design and model-specific feature provenance remain unresolved.

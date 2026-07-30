@@ -13,13 +13,13 @@ See: `.planning/PROJECT.md` (updated 2026-07-22)
 
 **Core value:** Produce auditable Qwen3-VL results whose inputs, candidate-action protocol, and failures can be independently reproduced without retraining a local model.
 
-**Current focus:** Complete P3IV and KEPP feasibility audits while the alternate split and training server remain unavailable; the verified Qwen3.5 result is recorded in current-workspace `REPORT.md` §16.
+**Current focus:** Use the verified OEPP server environment to design and validate P3IV/KEPP adapters; the alternate split remains blocked solely on authoritative provenance.
 
 ## Current Position
 
 Phase: Reviewer revision Phase 2 — P3IV and KEPP feasibility and OEPP integration.
-Status: The Qwen3.5 full evaluation is complete. It used `Qwen/Qwen3.5-397B-A17B`, `enable_thinking=false`, Base 855 / 855 API success, and Novel 1,294 / 1,297 API success; three retryable Novel 503 failures remain zero-scored missing predictions. `paper_compatible` Base `2.22/29.04/36.29`, Novel `7.71/35.87/59.80`; strict Base `2.22/28.51/35.78`, Novel `7.71/35.74/59.66` (SR/Acc/mIoU). P3IV/KEPP upstream feasibility is now active; alternate-split execution remains server/provenance-blocked.
-Last activity: 2026-07-30 — completed and audited the Qwen3.5 sequential full run, saved dual scoring and run evidence, and recorded a new three-track reviewer roadmap.
+Status: The Qwen3.5 full evaluation is complete. It used `Qwen/Qwen3.5-397B-A17B`, `enable_thinking=false`, Base 855 / 855 API success, and Novel 1,294 / 1,297 API success; three retryable Novel 503 failures remain zero-scored missing predictions. `paper_compatible` Base `2.22/29.04/36.29`, Novel `7.71/35.87/59.80`; strict Base `2.22/28.51/35.78`, Novel `7.71/35.74/59.66` (SR/Acc/mIoU). Server host `OEPP` is accessible at `/data1/wuyilu/OEPP-hjr`; its GPU/runtime/assets and preservation requirements are recorded in `.planning/SERVER-ENVIRONMENT.md`. P3IV/KEPP now require a validation-safe adapter and model-specific feature provenance; alternate-split execution remains provenance-blocked.
+Last activity: 2026-07-30 — audited the live server workspace, GPU runtime, disk capacity, feature archive, result artifacts, and dirty-worktree preservation boundary without changing remote files.
 
 ## Accumulated Context
 
@@ -66,10 +66,10 @@ Last activity: 2026-07-30 — completed and audited the Qwen3.5 sequential full 
 - **Embedding follow-up:** all planned server-side execution and artifact checks are complete. Before scientific claims, review all pre-specified figures and summaries without cherry-picking; archive/download the three complete server export directories using a resumable single-file transfer when local analysis is needed.
 - **OpenRouter Gemini constraint:** `google/gemini-3.1-flash-lite` remains region-unavailable. `google/gemini-3-flash-preview` completed this full T4 run only under the observed Japan VPN route; its preview revision, provider routing, geographic availability, visual preprocessing and API repeat variance remain unfrozen. Report it as a dated, route-conditioned hosted-API baseline rather than a portable capability ranking.
 - **Table V horizon scope:** the current hosted-API results deliberately cover only the historical `T=4`, 3+3 image comparator row. The paper also contains `T=3` rows, and historical T3 sequences/scripts/results exist under `OEPP_server/LLM`; however, the specialized portable visual extractor and manifest builder hard-code `HORIZON = 4`. `EXP-01` remains incomplete until T3 is separately extracted, replay-validated, piloted, and evaluated. The Experiment 4 `T=3` embedding study is not a substitute for that API evaluation.
-- **Reviewer revision execution:** Qwen3.5 is complete and reported. Static P3IV/KEPP feasibility is recorded in `.planning/P3IV-KEPP-FEASIBILITY.md`: KEPP is conditionally portable with feature/label/PKG gates, whereas P3IV requires a material, explicitly named input/action-head adaptation. Both require server feature provenance before valid training. The alternate split must be recovered from authoritative provenance and remains server-blocked; no new split results should be inferred from current split-1 models.
+- **Reviewer revision execution:** Qwen3.5 is complete and reported. Static P3IV/KEPP feasibility is recorded in `.planning/P3IV-KEPP-FEASIBILITY.md`: KEPP is conditionally portable with feature/label/PKG gates, whereas P3IV requires a material, explicitly named input/action-head adaptation. The server environment is now verified in `.planning/SERVER-ENVIRONMENT.md`; original P3IV S3D+audio provenance and both adapters remain unimplemented. The alternate split must be recovered from authoritative provenance; no new split results should be inferred from current split-1 models.
 
 ## Session Continuity
 
 Last session: 2026-07-30
-Stopped at: Qwen3.5 full audit complete. Next: complete P3IV and KEPP feasibility records, then recover the alternate split once server/provenance access returns.
+Stopped at: server environment documented without remote changes. Next: design KEPP/P3IV adapters and recover the alternate split from an authoritative source.
 Resume file: `.planning/STATE.md`

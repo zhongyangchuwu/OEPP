@@ -37,7 +37,7 @@ This is a static source audit, not a successful OEPP run.
 
 ## Shared gates before training
 
-1. Obtain training-server access and verify the exact feature archives required by the selected method.
+1. Server access is verified at `OEPP:/data1/wuyilu/OEPP-hjr`; verify the exact feature archives required by the selected method. The current VideoCLIP archive is present, but original P3IV S3D+audio provenance is not yet established.
 2. Freeze OEPP train / validation / Base / Novel JSON inputs and their action-ID mapping; hash every source file.
 3. Add a conversion/adapter that validates dimensions, action ranges, split membership, and no test-data reads during training or PKG/transition construction.
 4. Run a small training smoke test from random initialisation; confirm validation-only checkpoint selection.
@@ -45,4 +45,4 @@ This is a static source audit, not a successful OEPP run.
 
 ## Current blocker
 
-The training server and alternate-split provenance are unavailable. KEPP/P3IV can be designed and source-audited locally, but no valid OEPP training/inference result can be claimed until feature provenance, runtime environment, and the above gates are exercised.
+The server runtime, GPUs, workspace, and VideoCLIP feature archive are now verified in `.planning/SERVER-ENVIRONMENT.md`. Remaining blockers are the choice and implementation of a validation-safe adapter, model-specific feature provenance (especially P3IV's S3D+audio input), and alternate-split provenance. No valid OEPP training/inference result can be claimed until those gates are exercised.
