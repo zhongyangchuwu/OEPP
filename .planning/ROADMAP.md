@@ -1,86 +1,70 @@
-# Roadmap: OEPP Qwen3-VL API Evaluation
+# Roadmap: OEPP Reviewer Revision
 
-## Overview
+**Updated:** 2026-07-30
+**Scope:** reviewer-driven evidence expansion. The canonical execution contract is `.planning/REVIEWER-REVISION-PLAN.md`.
 
-Establish an audited visual-data manifest before enabling any remote call, then execute a small, resumable Qwen3-VL pilot, run the approved experimental matrix, and package metrics and protocol evidence for the paper revision.
+## Goal
+
+Address the three experimentally actionable reviewer gaps without changing the OEPP task definition during evaluation:
+
+1. add a current Qwen3.5 hosted MLLM Table V baseline;
+2. establish robustness under a recovered, independently frozen alternate event split;
+3. assess and, where technically valid, evaluate the public P3IV and KEPP procedure-planning methods.
 
 ## Phases
 
-- [ ] **Phase 1: Audit and visual manifests** — validate the supplied annotations and bind them to real observation frames.
-- [ ] **Phase 2: Guarded Qwen3-VL pilot** — verify one-request transport, response parsing, recovery, and metrics within the approval cap.
-- [ ] **Phase 3: Reviewer experiment matrix** — run the approved Base/Novel, horizon, image-count, action-pool, and seed comparisons.
-- [ ] **Phase 4: Analysis package** — summarize results, failure modes, cost metadata, and paper-ready evidence.
+### Phase 1: Qwen3.5 Table V baseline — Priority S
 
-## Phase Details
+**Goal:** Evaluate `Qwen/Qwen3.5-397B-A17B` through SiliconFlow using the audited historical Table V `T=4`, 3+3-image comparator protocol.
 
-### Phase 1: Audit and visual manifests
+**Fixed contract:** Base 855 and Novel 1,297 observations; source-order split-specific pools; split-specific legacy v2 prompts; `temperature=0`; `enable_thinking=false`; no retry; `paper_compatible` main metrics plus `strict` audit.
 
-**Goal:** Produce a data audit and valid, reproducible pilot manifests without invoking any API.
+**Acceptance criteria:**
 
-**Depends on:** Nothing.
+1. A 2 Base + 2 Novel pilot demonstrates exact returned model, six-image transport, four-action parser success, `finish_reason=stop`, zero API failures, and zero reasoning tokens.
+2. Each full split has one-to-one manifest/request/response/prediction coverage; failures remain in the denominator.
+3. Results retain request configuration, usage, latency, raw responses, model identity, and both scoring modes.
+4. The report names SiliconFlow, date, model ID, prompt, candidate order, image preprocessing and provider limitations; it does not make a controlled capability claim.
 
-**Requirements:** DATA-01, DATA-02, DATA-03.
+**Status:** pilot complete; approved Base 855 → Novel 1,297 full run starts next.
 
-**Success Criteria:**
-1. The audit reproduces the paper's Table II split counts and reports any observed discrepancy.
-2. The audit identifies all action-pool and annotation integrity issues without altering source data.
-3. A manifest builder rejects missing, unreadable, ambiguous, or incorrectly sized visual observations.
-4. Once source frames are supplied, a 10-Base plus 10-Novel pilot manifest validates every image and action mapping.
+### Phase 2: P3IV and KEPP feasibility and OEPP integration — Priority A
 
-**Plans:** TBD.
+**Goal:** Determine whether each public method can be evaluated under OEPP without changing its benchmark task, then implement individually valid baselines.
 
-### Phase 2: Guarded Qwen3-VL pilot
+**Acceptance criteria:**
 
-**Goal:** Complete approved low-volume Qwen3-VL requests with durable provenance and exact output validation.
+1. Record upstream commit/license, dependencies, data representation, training target, inference horizon, candidate-action decoding, and evaluation protocol for P3IV and KEPP separately.
+2. Map OEPP inputs and split-specific action pools to each method; reject any mapping that leaks Novel test labels or trains/selects on test data.
+3. Establish fresh initialisation, validation-only checkpoint selection, and Base/Novel export/evaluation evidence for every portable method.
+4. If a method is not portable, record the precise incompatibility and do not replace it with an unlabelled approximation.
 
-**Depends on:** Phase 1.
+**Status:** blocked only on feasibility audit; does not require the unavailable training server until a compatible implementation is ready.
 
-**Requirements:** SAFE-01, SAFE-02, API-01, EVAL-01, EVAL-02.
+### Phase 3: Alternate split robustness matrix — Priority B
 
-**Success Criteria:**
-1. No API call is possible under the checked-in configuration.
-2. A reviewed pilot saves raw responses, parsed predictions, non-secret request metadata, usage, latency, and retry history.
-3. Restarting a run skips successful samples and never silently changes a prediction.
-4. Metrics include all valid manifest samples, including failures.
+**Goal:** Recover and validate the original alternate event split, then rerun one frozen baseline matrix on it.
 
-**Plans:** TBD.
+**Acceptance criteria:**
 
-### Phase 3: Reviewer experiment matrix
+1. Recover the alternate split from authoritative provenance, preserve the source files unchanged, and normalize only into a versioned OEPP split manifest matching the current JSON schema.
+2. Audit event membership, action-pool membership, duplicate videos, counts, transferability rules, feature/frame availability, and Base/Novel leakage before any training.
+3. Rerun the frozen baseline set — MLP, Transformer, PDPP, plus portable P3IV and KEPP — with identical feature, seed, epoch, and validation-selection rules per model.
+4. Report split-specific metrics and uncertainty separately; never average incomparable split definitions or omit a failed method.
 
-**Goal:** Run the approved matrix under both original and Total-pool action protocols.
+**Status:** blocked while the training server and the alternate split provenance are unavailable. Begin recovery locally when its source path or archive is found.
 
-**Depends on:** Phase 2.
+## Dependency order
 
-**Requirements:** EXP-01.
+```text
+Qwen3.5 pilot → Qwen3.5 full audit
+P3IV / KEPP feasibility → freeze baseline matrix
+alternate split recovery + audit → rerun frozen matrix
+```
 
-**Success Criteria:**
-1. Results identify every split, horizon, image setting, pool type, model ID, prompt version, and seed.
-2. Original protocol results use Base→Base and Novel→Novel action pools.
-3. Unified protocol results use the Total pool for both splits.
-4. Seed means and standard deviations are reported without pooling incomparable configurations.
+## Out of scope for these phases
 
-**Plans:** TBD.
-
-### Phase 4: Analysis package
-
-**Goal:** Produce revision-ready tables and failure analysis supported by saved runs.
-
-**Depends on:** Phase 3.
-
-**Requirements:** EVAL-02.
-
-**Success Criteria:**
-1. The report includes overall and macro-by-event metrics, API/parse failure rates, token usage, and latency.
-2. Comparison tables state protocol differences and limitations of zero-shot proprietary-model evaluation.
-3. Every reported aggregate links to immutable run metadata and predictions.
-
-**Plans:** TBD.
-
-## Progress
-
-| Phase | Plans Complete | Status | Completed |
-|---|---:|---|---|
-| 1. Audit and visual manifests | 0/TBD | In progress | — |
-| 2. Guarded Qwen3-VL pilot | 0/TBD | Not started | — |
-| 3. Reviewer experiment matrix | 0/TBD | Not started | — |
-| 4. Analysis package | 0/TBD | Not started | — |
+- Treating Experiment 4 embedding metrics as MLLM Table V metrics.
+- Silently changing action pools, prompts, horizons, candidate order, image preprocessing, or scoring to make a new method fit.
+- Full hosted API calls before a passing pilot and a private approval artifact.
+- Claiming alternative-split robustness before the same frozen baseline set has been run.

@@ -30,6 +30,8 @@ TABLE_V_LEGACY_PROMPT_MODE = "table_v_legacy"
 PROMPT_MODES = frozenset({GENERIC_PROMPT_MODE, TABLE_V_LEGACY_PROMPT_MODE})
 IMAGE_DETAILS = frozenset({"auto", "low", "high"})
 
+RESERVED_PROVIDER_EXTRA_BODY_FIELDS = frozenset({"model", "messages", "temperature", "max_tokens"})
+
 
 def _mapping(value: Any, name: str) -> dict[str, Any]:
     if not isinstance(value, dict):
@@ -120,6 +122,23 @@ def _image_detail(request_config: dict[str, Any]) -> str:
         choices = ", ".join(sorted(IMAGE_DETAILS))
         raise ValueError(f"request.image_detail must be one of: {choices}.")
     return image_detail
+
+
+def _provider_extra_body(request_config: dict[str, Any]) -> dict[str, Any] | None:
+    extra_body = request_config.get("provider_extra_body")
+    if extra_body is None:
+        return None
+    if not isinstance(extra_body, dict):
+        raise ValueError("request.provider_extra_body must be a mapping when set.")
+    reserved_fields = RESERVED_PROVIDER_EXTRA_BODY_FIELDS.intersection(extra_body)
+    if reserved_fields:
+        names = ", ".join(sorted(reserved_fields))
+        raise ValueError(f"request.provider_extra_body cannot override: {names}.")
+    try:
+        json.dumps(extra_body)
+    except (TypeError, ValueError) as error:
+        raise ValueError("request.provider_extra_body must be JSON serializable.") from error
+    return extra_body
 
 
 def _mime_type(path: Path) -> str:
@@ -344,6 +363,7 @@ def run(
         raise ValueError("request.backoff_seconds must be a positive number.")
     backoff_seconds = float(backoff)
     image_detail = _image_detail(request_config)
+    provider_extra_body = _provider_extra_body(request_config)
     api_key, base_url, model = _load_environment(model_config)
     prompt_version, prompt_path, prompt_mode = _prompt_path(config)
     response_parser = _response_parser(config)
@@ -435,6 +455,7 @@ def run(
                     messages=messages,
                     temperature=request_config["temperature"],
                     max_tokens=request_config["max_tokens"],
+                    **({"extra_body": provider_extra_body} if provider_extra_body else {}),
                 )
                 latency_seconds = time.monotonic() - started_at
                 raw_content = completion.choices[0].message.content or ""

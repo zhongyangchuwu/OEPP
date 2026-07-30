@@ -30,14 +30,15 @@ uv run python oepp_api_eval/src/inspect_data.py --data-root data --output-dir oe
 
 The commands below enter `oepp_api_eval/` for relative data paths. uv discovers the root project, uses its root `.venv/`, and does not create a nested environment.
 
-Create an ignored `.env` from `.env.example`. The active SiliconFlow Qwen3-VL configuration reads the key only from the shell and stores endpoint/model selection separately:
+Create an ignored `.env` from `.env.example`. SiliconFlow configurations read the key only from the shell and store endpoint/model selection separately:
 
 ```dotenv
 SILICONFLOW_BASE_URL=https://api.siliconflow.cn/v1
 SILICONFLOW_QWEN_MODEL=Qwen/Qwen3-VL-32B-Instruct
+SILICONFLOW_QWEN35_MODEL=Qwen/Qwen3.5-397B-A17B
 ```
 
-Export `SILICONFLOW_API_KEY` in the same shell. The key is never read into a config snapshot, a log, or a JSONL artifact.
+Export `SILICONFLOW_API_KEY` in the same shell. The key is never read into a config snapshot, a log, or a JSONL artifact. `siliconflow_qwen35_tablev_t4_3x3{,_novel}.yaml` requests `enable_thinking: false` through the recorded provider extra body, preventing the Qwen3.5 default reasoning budget from being billed for a four-line action response.
 
 ### OpenRouter Gemini configurations
 
