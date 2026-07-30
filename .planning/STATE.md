@@ -13,13 +13,13 @@ See: `.planning/PROJECT.md` (updated 2026-07-22)
 
 **Core value:** Produce auditable Qwen3-VL results whose inputs, candidate-action protocol, and failures can be independently reproduced without retraining a local model.
 
-**Current focus:** Run the approved SiliconFlow Qwen3.5 full Table V baseline after the passing multimodal pilot; the reviewer revision task partition is in `.planning/REVIEWER-REVISION-PLAN.md`.
+**Current focus:** Complete P3IV and KEPP feasibility audits while the alternate split and training server remain unavailable; the verified Qwen3.5 result is recorded in current-workspace `REPORT.md` §16.
 
 ## Current Position
 
-Phase: Reviewer revision Phase 1 — Qwen3.5 Table V hosted-API baseline.
-Status: `Qwen/Qwen3.5-397B-A17B` is account-visible on SiliconFlow. The first 2+2 pilot exposed the provider default `enable_thinking=true`, which consumed 3,185–4,274 reasoning tokens despite four-line outputs. Runner support and public configs now record `provider_extra_body.enable_thinking=false`; a replacement 2 Base + 2 Novel pilot passed with 0 reasoning tokens, 4 / 4 API success, parser success, and `finish_reason=stop`. Private Base 855 / Novel 1,297 approval and configs are ready for the sequential full run.
-Last activity: 2026-07-30 — replaced the stale API-only roadmap with the three reviewer tracks (Qwen3.5, P3IV/KEPP, alternate split), queried the SiliconFlow model inventory, and validated the non-thinking Qwen3.5 request path.
+Phase: Reviewer revision Phase 2 — P3IV and KEPP feasibility and OEPP integration.
+Status: The Qwen3.5 full evaluation is complete. It used `Qwen/Qwen3.5-397B-A17B`, `enable_thinking=false`, Base 855 / 855 API success, and Novel 1,294 / 1,297 API success; three retryable Novel 503 failures remain zero-scored missing predictions. `paper_compatible` Base `2.22/29.04/36.29`, Novel `7.71/35.87/59.80`; strict Base `2.22/28.51/35.78`, Novel `7.71/35.74/59.66` (SR/Acc/mIoU). P3IV/KEPP upstream feasibility is now active; alternate-split execution remains server/provenance-blocked.
+Last activity: 2026-07-30 — completed and audited the Qwen3.5 sequential full run, saved dual scoring and run evidence, and recorded a new three-track reviewer roadmap.
 
 ## Accumulated Context
 
@@ -56,7 +56,7 @@ Last activity: 2026-07-30 — replaced the stale API-only roadmap with the three
 - Publication-readiness audit: artifact coverage is one-to-one; all response IDs are unique and end with `stop`; every strict failure is an out-of-pool action rather than a malformed/truncated sequence. The Table V result is publishable as a hosted-API baseline with explicit comparability, provider-versioning, image-preprocessing, candidate-order, and training-contamination caveats; it is not a controlled Qwen-versus-GPT capability claim. Details: current-workspace `REPORT.md` §13.
 - OpenRouter account metadata on 2026-07-26 confirmed that `google/gemini-3.1-flash-lite` and `google/gemini-3-flash-preview` accept image input and text output. Flash-Lite's two Base attempts and the initial Flash Preview attempt returned non-retryable 403 region errors; a Japan VPN Flash Preview retry returned a four-line, in-pool parsed response from Google with 7,281 prompt / 30 completion tokens and reported cost `$0.0037305`. Novel was not called. Details: current-workspace `REPORT.md` §14.
 - Gemini Flash Preview full audit: Base 855 / Novel 1,297 manifest-request-response-prediction IDs are unique and identical per split; 2,152 / 2,152 API responses returned `google/gemini-3-flash-preview` via Google under the Japan VPN route. Paper-compatible Base `5.61/36.70/47.96`, Novel `12.26/42.44/66.57`; strict Base unchanged and Novel `12.26/42.42/66.51` (SR/Acc/mIoU). There were 0 API failures and 6 strict failures: four token-cap degeneracies and two Novel out-of-pool action names. Audit: `oepp_api_eval/runs/openrouter_gemini3flashpreview_full_audit_20260726.json`; report: current-workspace `REPORT.md` §15.
-- SiliconFlow `GET /models` on 2026-07-30 returned six Qwen3.5 IDs; the selected largest account-visible ID is `Qwen/Qwen3.5-397B-A17B`. Its first 2+2 pilot passed parser/transport but used the provider default 4,096-token thinking budget. The final 2+2 pilot with `enable_thinking=false` had matching request/response/prediction IDs, four API successes, four parser successes, four `stop` finishes, exact returned model IDs, and zero reasoning tokens. The full run must use only this latter configuration.
+- SiliconFlow `GET /models` on 2026-07-30 returned six Qwen3.5 IDs; the selected largest account-visible ID is `Qwen/Qwen3.5-397B-A17B`. Its first 2+2 pilot showed the provider default 4,096-token thinking budget; the final 2+2 pilot with `enable_thinking=false` had matching request/response/prediction IDs, four API successes, four parser successes, four `stop` finishes, exact returned model IDs, and zero reasoning tokens. The subsequent full run had Base 855 / 855 API success and Novel 1,294 / 1,297 API success. All 2,149 successful responses had zero reasoning tokens. Base strict failures: 16 exact pool-out-of-set action names; Novel strict failures: four such names plus three retryable 503 API failures. Full audit: `oepp_api_eval/runs/siliconflow_qwen35_397b_full_audit_20260730.json`; report: current-workspace `REPORT.md` §16.
 
 ### Blockers/Concerns
 
@@ -66,10 +66,10 @@ Last activity: 2026-07-30 — replaced the stale API-only roadmap with the three
 - **Embedding follow-up:** all planned server-side execution and artifact checks are complete. Before scientific claims, review all pre-specified figures and summaries without cherry-picking; archive/download the three complete server export directories using a resumable single-file transfer when local analysis is needed.
 - **OpenRouter Gemini constraint:** `google/gemini-3.1-flash-lite` remains region-unavailable. `google/gemini-3-flash-preview` completed this full T4 run only under the observed Japan VPN route; its preview revision, provider routing, geographic availability, visual preprocessing and API repeat variance remain unfrozen. Report it as a dated, route-conditioned hosted-API baseline rather than a portable capability ranking.
 - **Table V horizon scope:** the current hosted-API results deliberately cover only the historical `T=4`, 3+3 image comparator row. The paper also contains `T=3` rows, and historical T3 sequences/scripts/results exist under `OEPP_server/LLM`; however, the specialized portable visual extractor and manifest builder hard-code `HORIZON = 4`. `EXP-01` remains incomplete until T3 is separately extracted, replay-validated, piloted, and evaluated. The Experiment 4 `T=3` embedding study is not a substitute for that API evaluation.
-- **Reviewer revision execution:** the Qwen3.5 hosted baseline is active. P3IV/KEPP require separate feasibility audits before they join any matrix. The alternate split must be recovered from authoritative provenance and remains server-blocked; no new split results should be inferred from current split-1 models.
+- **Reviewer revision execution:** Qwen3.5 is complete and reported. P3IV/KEPP feasibility is active; both methods must prove an OEPP mapping before any training. The alternate split must be recovered from authoritative provenance and remains server-blocked; no new split results should be inferred from current split-1 models.
 
 ## Session Continuity
 
-Last session: 2026-07-26  
-Stopped at: Gemini Flash Preview T4 Base / Novel full run completed and was audited. The next unresolved MLLM scope item is separate Table V T3 visual extraction, replay validation, pilot and full evaluation.
+Last session: 2026-07-30
+Stopped at: Qwen3.5 full audit complete. Next: complete P3IV and KEPP feasibility records, then recover the alternate split once server/provenance access returns.
 Resume file: `.planning/STATE.md`

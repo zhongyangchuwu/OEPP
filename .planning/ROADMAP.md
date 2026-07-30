@@ -26,7 +26,7 @@ Address the three experimentally actionable reviewer gaps without changing the O
 3. Results retain request configuration, usage, latency, raw responses, model identity, and both scoring modes.
 4. The report names SiliconFlow, date, model ID, prompt, candidate order, image preprocessing and provider limitations; it does not make a controlled capability claim.
 
-**Status:** pilot complete; approved Base 855 → Novel 1,297 full run starts next.
+**Status:** complete and audited. Base has 855 / 855 API success; Novel has 1,294 / 1,297 API success, with three retained retryable 503 failures. Full audit: `oepp_api_eval/runs/siliconflow_qwen35_397b_full_audit_20260730.json`.
 
 ### Phase 2: P3IV and KEPP feasibility and OEPP integration — Priority A
 
@@ -39,7 +39,7 @@ Address the three experimentally actionable reviewer gaps without changing the O
 3. Establish fresh initialisation, validation-only checkpoint selection, and Base/Novel export/evaluation evidence for every portable method.
 4. If a method is not portable, record the precise incompatibility and do not replace it with an unlabelled approximation.
 
-**Status:** blocked only on feasibility audit; does not require the unavailable training server until a compatible implementation is ready.
+**Status:** upstream feasibility audit is the active next task; server training is deferred until a portable, validation-safe mapping is established.
 
 ### Phase 3: Alternate split robustness matrix — Priority B
 

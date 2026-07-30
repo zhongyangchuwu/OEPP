@@ -126,6 +126,8 @@ uv run python src/run_api.py \
 The runner records raw responses and action text, rejects a manifest for the wrong configured split,
 and retains malformed responses as failures.
 
+For the reviewer Qwen3.5 baseline, use the separate offline `siliconflow_qwen35_tablev_t4_3x3{,_novel}.yaml` configurations and set `SILICONFLOW_QWEN35_MODEL=Qwen/Qwen3.5-397B-A17B` only in the execution environment. Those configurations record `provider_extra_body.enable_thinking=false`; a private approval file is required before any run above ten calls. Do not reuse a Qwen3-VL run name, config snapshot, or ledger budget for Qwen3.5.
+
 ## Phase 1: audit and visual manifests
 
 The audit reports files, fields, sample/segment/horizon counts, action-pool integrity, duplicate video identifiers, and frame availability. Its sequence-window counts follow the evaluation protocol: a sequence shorter than $T$ contributes one left-padded window, rather than being excluded. Therefore, the current annotations contain 888 Base and 1,297 Novel $T=4$ windows before the 33 Base windows whose source videos are unavailable are excluded.

@@ -32,3 +32,7 @@ P3IV and KEPP feasibility may proceed while Qwen3.5 runs. Alternate-split full e
 ## Immediate execution record
 
 The account-visible SiliconFlow models query on 2026-07-30 returned six Qwen3.5 IDs. This track selects the largest available ID, `Qwen/Qwen3.5-397B-A17B`; the 2+2 pilot, rather than model-list metadata, is the multimodal compatibility gate.
+
+## Qwen3.5 execution outcome
+
+The non-thinking 2 Base + 2 Novel pilot satisfied the transport/format gate. The approved sequential full run completed on 2026-07-30: Base 855 / 855 API success and Novel 1,294 / 1,297 API success. The three Novel HTTP 503 failures and all candidate-pool failures remain in the scoring denominators. `paper_compatible` is Base `2.22/29.04/36.29` and Novel `7.71/35.87/59.80`; `strict` is Base `2.22/28.51/35.78` and Novel `7.71/35.74/59.66` (SR/Acc/mIoU). Full audit: `oepp_api_eval/runs/siliconflow_qwen35_397b_full_audit_20260730.json`.
