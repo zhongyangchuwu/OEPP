@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from oepp.data import FeatureKind, FeatureRoots, feature_dimension, resolve_feature_path
 from oepp.data.features import VIDEOCLIP_ROOT_ENV, default_videoclip_root, repository_root
+from oepp.legacy.feature_paths import videoclip_root as legacy_videoclip_root
 
 
 class FeaturePathTests(unittest.TestCase):
@@ -12,6 +13,12 @@ class FeaturePathTests(unittest.TestCase):
         with patch.dict(os.environ, {VIDEOCLIP_ROOT_ENV: ""}, clear=False):
             self.assertEqual(
                 default_videoclip_root(), repository_root() / "features" / "OEPP_videoclip"
+            )
+
+    def test_legacy_default_uses_the_canonical_repository_feature_root(self) -> None:
+        with patch.dict(os.environ, {VIDEOCLIP_ROOT_ENV: ""}, clear=False):
+            self.assertEqual(
+                legacy_videoclip_root(), repository_root() / "features" / "OEPP_videoclip"
             )
 
     def test_environment_override_controls_videoclip_root(self) -> None:

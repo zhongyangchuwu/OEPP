@@ -53,7 +53,7 @@ class GaussianDiffusion(nn.Module):
                 (np.linspace(0, np.sqrt(n_timesteps), ddim_timesteps)) ** 2
             ).astype(int)
         else:
-            assert RuntimeError()
+            raise ValueError(f"Unsupported DDIM discretization method: {ddim_discr_method!r}")
 
         self.ddim_timesteps = ddim_timesteps
         self.ddim_timestep_seq = ddim_timestep_seq
@@ -103,9 +103,7 @@ class GaussianDiffusion(nn.Module):
         x_recon = self.model(x, t, cond)
 
         if self.clip_denoised:
-            x_recon.clamp(-1.0, 1.0)
-        else:
-            assert RuntimeError()
+            x_recon = x_recon.clamp(-1.0, 1.0)
 
         model_mean, posterior_variance, posterior_log_variance = self.q_posterior(
             x_start=x_recon, x_t=x, t=t
@@ -124,9 +122,7 @@ class GaussianDiffusion(nn.Module):
         x_recon = self.model(x, t, cond)
 
         if self.clip_denoised:
-            x_recon.clamp(-1.0, 1.0)
-        else:
-            assert RuntimeError()
+            x_recon = x_recon.clamp(-1.0, 1.0)
 
         eps = self._predict_eps_from_xstart(x, t, x_recon)
         alpha_bar = extract(self.alphas_cumprod, t, x.shape)
