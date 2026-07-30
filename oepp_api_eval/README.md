@@ -15,7 +15,7 @@ max_calls: 0
 
 No command in this project can issue an API request in that state.
 
-中文任务进展、服务器提帧结果和问题记录保存在当前 workspace 的 `REPORT.md`，不随仓库提交。
+中文任务进展、服务器提帧结果和高层问题记录保存在当前 workspace 的 `../../OEPP-project/experiments/tablev-api-report.md`，不随代码仓库提交。
 
 ## Environment
 
@@ -216,6 +216,6 @@ or distinct scoring modes.
 
 ## Sources
 
-- `../OEPP-TIP.pdf`, Table II and Table V: benchmark scope and prior GPT image/horizon experiments.
+- `../../OEPP-project/paper/OEPP-TIP.pdf`, Table II and Table V: benchmark scope and prior GPT image/horizon experiments.
 - `../dataset/dataset.py`: original split selection, action-pool convention, and feature-only external frame paths.
 - [Qwen3-VL OpenAI-compatible API example](https://github.com/QwenLM/Qwen3-VL): documented `OpenAI` client and `image_url` input.
