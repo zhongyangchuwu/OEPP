@@ -4,6 +4,10 @@
 **Host:** `OEPP` (`gpuserver-10`)
 **Writable workspace:** `/data1/wuyilu/OEPP-hjr` only.
 
+## Repository roles
+
+`OEPP/` in the local workspace is the sole authoring checkout: make, test, commit, and push every code or planning change there. `/data1/wuyilu/OEPP-hjr` is its runtime clone and execution workspace only. Never develop directly on the server or treat its stale Git revision as source of truth.
+
 ## Verified environment
 
 | Item | Observed value |
@@ -54,7 +58,7 @@ These files and directories are evidence or local infrastructure. Do not run `gi
 
    Use the root `pyproject.toml` and `uv.lock`; do not activate or modify `oepp_api_eval/.venv/`.
 
-2. Before changing server code, inspect the remote revision and untracked files. Synchronize only committed local source changes into the writable workspace by a reviewed operation. Preserve the listed result and infrastructure paths.
+2. Deploy only an already committed local source revision. The server currently cannot complete `git ls-remote origin HEAD` over its HTTPS route (`GnuTLS recv error (-110)`), so do not rely on GitHub deployment until that tunnel path is retested successfully. Use the reviewed rsync procedure below in the interim.
 
 3. Before a GPU job, re-check occupancy. Select explicit devices with `CUDA_VISIBLE_DEVICES`; the all-idle state above is only an observation, not a reservation.
 
@@ -73,6 +77,39 @@ These files and directories are evidence or local infrastructure. Do not run `gi
 5. Place all generated checkpoints, logs, converted data, and exports under the workspace, using a dated, model-specific directory. Do not overwrite the completed `*_run1/` or calibration artifacts.
 
 6. Keep API keys in ignored environment files only. API calls run locally unless a separate server-side private configuration, approval artifact, and explicit user instruction authorize them.
+
+## Deployment policy while server GitHub access fails
+
+An integrity-checked 128 MiB incompressible rsync transfer through the `OEPP` tunnel completed in 34.358 seconds: **3.73 MiB/s** (31.25 Mbit/s), with matching local/remote SHA-256. This is suitable for code and moderate artifacts: approximately 200 MiB in 54 seconds and 1.3 GiB in 5.8 minutes at the observed rate. It is not a bandwidth reservation.
+
+Use rsync only as a one-way local-to-server deployment. Never use `--delete`; the server contains results and user-owned untracked files. First inspect a dry run, then deploy the reviewed source tree:
+
+```bash
+LOCAL_ROOT=OEPP/
+REMOTE_ROOT=OEPP:/data1/wuyilu/OEPP-hjr/
+RSYNC_EXCLUDES=(
+  --exclude=.git/ --exclude=.tools/ --exclude=.venv/ --exclude=.ruff_cache/
+  --exclude=__pycache__/ --exclude=data/ --exclude=features/
+  --exclude=results/ --exclude=embedding_results/ --exclude=OEPP_videoclip.zip
+  --exclude=oepp_api_eval/.venv/ --exclude=oepp_api_eval/.env
+  --exclude=oepp_api_eval/private/ --exclude=oepp_api_eval/runs/
+  --exclude=oepp_api_eval/manifests/ --exclude=oepp_api_eval/sampled_frames/
+)
+sync_source() {
+  rsync "$@" --itemize-changes --checksum "${RSYNC_EXCLUDES[@]}" \
+    "$LOCAL_ROOT" "$REMOTE_ROOT"
+}
+
+# Inspect this output; do not deploy before reviewing it.
+sync_source -an
+
+# Deploy only after the dry-run itemization is accepted. No --delete.
+sync_source -a --partial --mkpath
+```
+
+Record the local Git SHA and deployment timestamp under a new server result or deployment-metadata directory with each executed run. The server's `.git` revision remains the old clone commit after an rsync overlay; the deployment record, not `git rev-parse` on the server, identifies the runtime source version.
+
+Use GitHub/Git deployment again only after the server can successfully run `git ls-remote origin HEAD` through the tunnel. A Git update remains preferable for source history when its transport is healthy; rsync is the safe operational fallback, not a replacement source of truth.
 
 ## Consequences for current reviewer tasks
 

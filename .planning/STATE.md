@@ -13,13 +13,13 @@ See: `.planning/PROJECT.md` (updated 2026-07-22)
 
 **Core value:** Produce auditable Qwen3-VL results whose inputs, candidate-action protocol, and failures can be independently reproduced without retraining a local model.
 
-**Current focus:** Use the verified OEPP server environment to design and validate P3IV/KEPP adapters; the alternate split remains blocked solely on authoritative provenance.
+**Current focus:** Use local-authoring plus reviewed rsync deployment to reach the verified OEPP server while its GitHub HTTPS route fails; then design and validate P3IV/KEPP adapters. The alternate split remains blocked solely on authoritative provenance.
 
 ## Current Position
 
 Phase: Reviewer revision Phase 2 — P3IV and KEPP feasibility and OEPP integration.
 Status: The Qwen3.5 full evaluation is complete. It used `Qwen/Qwen3.5-397B-A17B`, `enable_thinking=false`, Base 855 / 855 API success, and Novel 1,294 / 1,297 API success; three retryable Novel 503 failures remain zero-scored missing predictions. `paper_compatible` Base `2.22/29.04/36.29`, Novel `7.71/35.87/59.80`; strict Base `2.22/28.51/35.78`, Novel `7.71/35.74/59.66` (SR/Acc/mIoU). Server host `OEPP` is accessible at `/data1/wuyilu/OEPP-hjr`; its GPU/runtime/assets and preservation requirements are recorded in `.planning/SERVER-ENVIRONMENT.md`. P3IV/KEPP now require a validation-safe adapter and model-specific feature provenance; alternate-split execution remains provenance-blocked.
-Last activity: 2026-07-30 — audited the live server workspace, GPU runtime, disk capacity, feature archive, result artifacts, and dirty-worktree preservation boundary without changing remote files.
+Last activity: 2026-07-30 — benchmarked the active `OEPP` SSH-tunnel rsync path at 3.73 MiB/s with end-to-end SHA-256 verification, and documented a no-delete local-authoring deployment policy after the server's GitHub HTTPS probe failed.
 
 ## Accumulated Context
 
@@ -67,6 +67,7 @@ Last activity: 2026-07-30 — audited the live server workspace, GPU runtime, di
 - **OpenRouter Gemini constraint:** `google/gemini-3.1-flash-lite` remains region-unavailable. `google/gemini-3-flash-preview` completed this full T4 run only under the observed Japan VPN route; its preview revision, provider routing, geographic availability, visual preprocessing and API repeat variance remain unfrozen. Report it as a dated, route-conditioned hosted-API baseline rather than a portable capability ranking.
 - **Table V horizon scope:** the current hosted-API results deliberately cover only the historical `T=4`, 3+3 image comparator row. The paper also contains `T=3` rows, and historical T3 sequences/scripts/results exist under `OEPP_server/LLM`; however, the specialized portable visual extractor and manifest builder hard-code `HORIZON = 4`. `EXP-01` remains incomplete until T3 is separately extracted, replay-validated, piloted, and evaluated. The Experiment 4 `T=3` embedding study is not a substitute for that API evaluation.
 - **Reviewer revision execution:** Qwen3.5 is complete and reported. Static P3IV/KEPP feasibility is recorded in `.planning/P3IV-KEPP-FEASIBILITY.md`: KEPP is conditionally portable with feature/label/PKG gates, whereas P3IV requires a material, explicitly named input/action-head adaptation. The server environment is now verified in `.planning/SERVER-ENVIRONMENT.md`; original P3IV S3D+audio provenance and both adapters remain unimplemented. The alternate split must be recovered from authoritative provenance; no new split results should be inferred from current split-1 models.
+- **Server deployment:** all code changes remain local-first. The remote workspace is a runtime clone with dirty user-owned outputs; its GitHub HTTPS `ls-remote` currently fails over the tunnel, while verified rsync provides a 3.73 MiB/s fallback. Follow `.planning/SERVER-ENVIRONMENT.md`; no `--delete`, blind pull, clean, reset, or remote source editing.
 
 ## Session Continuity
 
