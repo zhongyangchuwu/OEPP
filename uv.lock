@@ -802,8 +802,8 @@ name = "mkl"
 version = "2021.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "intel-openmp", marker = "(python_full_version < '3.13' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'extra-4-oepp-cu118') or (python_full_version >= '3.13' and sys_platform == 'linux' and extra == 'extra-4-oepp-cpu') or (python_full_version >= '3.13' and extra != 'extra-4-oepp-cpu' and extra == 'extra-4-oepp-cu118') or (platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'extra-4-oepp-cpu') or (platform_machine != 'aarch64' and extra != 'extra-4-oepp-cpu' and extra == 'extra-4-oepp-cu118') or (platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'extra-4-oepp-cpu') or (platform_python_implementation != 'CPython' and extra != 'extra-4-oepp-cpu' and extra == 'extra-4-oepp-cu118') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-4-oepp-cpu') or (sys_platform == 'darwin' and extra == 'extra-4-oepp-cu118') or (sys_platform != 'linux' and extra != 'extra-4-oepp-cpu' and extra == 'extra-4-oepp-cu118')" },
-    { name = "tbb", marker = "(python_full_version < '3.13' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'extra-4-oepp-cu118') or (python_full_version >= '3.13' and sys_platform == 'linux' and extra == 'extra-4-oepp-cpu') or (python_full_version >= '3.13' and extra != 'extra-4-oepp-cpu' and extra == 'extra-4-oepp-cu118') or (platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'extra-4-oepp-cpu') or (platform_machine != 'aarch64' and extra != 'extra-4-oepp-cpu' and extra == 'extra-4-oepp-cu118') or (platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'extra-4-oepp-cpu') or (platform_python_implementation != 'CPython' and extra != 'extra-4-oepp-cpu' and extra == 'extra-4-oepp-cu118') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-4-oepp-cpu') or (sys_platform == 'darwin' and extra == 'extra-4-oepp-cu118') or (sys_platform != 'linux' and extra != 'extra-4-oepp-cpu' and extra == 'extra-4-oepp-cu118')" },
+    { name = "intel-openmp", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (sys_platform != 'darwin' and sys_platform != 'linux')" },
+    { name = "tbb", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (sys_platform != 'darwin' and sys_platform != 'linux')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b6/b2/b8c755092e3881d6b5ea74be49c7bf3758b6174296626aed39c3416a1b02/mkl-2021.4.0-py2.py3-none-macosx_10_15_x86_64.macosx_11_0_x86_64.whl", hash = "sha256:67460f5cd7e30e405b54d70d1ed3ca78118370b65f7327d495e9c8847705e2fb", size = 186391276, upload-time = "2021-09-28T17:19:34.028Z" },
@@ -946,7 +946,7 @@ name = "nvidia-cudnn-cu11"
 version = "8.7.0.84"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-cublas-cu11" },
+    { name = "nvidia-cublas-cu11", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (sys_platform != 'darwin' and sys_platform != 'linux')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/0b/f6/921e080645b9e66fbf7567b5aa1741bcded69862f42f1dce796883c3345c/nvidia_cudnn_cu11-8.7.0.84-py3-none-manylinux1_x86_64.whl", hash = "sha256:b3e062498fbbb1c1930435a6a454c1b41c903e1e65b7063bd2b4021e8285408e", size = 728455279, upload-time = "2022-11-30T00:31:11.15Z" },
@@ -979,7 +979,7 @@ name = "nvidia-cusolver-cu11"
 version = "11.4.1.48"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-cublas-cu11" },
+    { name = "nvidia-cublas-cu11", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (sys_platform != 'darwin' and sys_platform != 'linux')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/55/ee/939ff0104991dd7bdabb4c9767994c612ba0e1c9a55672a1ddd42f5e5b16/nvidia_cusolver_cu11-11.4.1.48-py3-none-manylinux1_x86_64.whl", hash = "sha256:ca538f545645b7e6629140786d3127fe067b3d5a085bd794cde5bfe877c8926f", size = 128240842, upload-time = "2022-10-03T23:30:24.348Z" },
@@ -1020,8 +1020,8 @@ wheels = [
 
 [[package]]
 name = "oepp"
-version = "0.1.0"
-source = { virtual = "." }
+version = "0.2.0"
+source = { editable = "." }
 dependencies = [
     { name = "einops" },
     { name = "httpx", extra = ["socks"] },
@@ -1669,7 +1669,7 @@ name = "triton"
 version = "2.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "filelock" },
+    { name = "filelock", marker = "(python_full_version < '3.12' and platform_machine != 'aarch64' and sys_platform == 'linux') or (python_full_version < '3.12' and sys_platform != 'darwin' and sys_platform != 'linux')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/db/ee/8d50d44ed5b63677bb387f4ee67a7dbaaded0189b320ffe82685a6827728/triton-2.3.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:5ce4b8ff70c48e47274c66f269cce8861cf1dc347ceeb7a67414ca151b1822d8", size = 168055246, upload-time = "2024-04-05T02:47:42.984Z" },

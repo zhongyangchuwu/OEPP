@@ -5,7 +5,7 @@ from unittest.mock import patch
 try:
     import torch
 
-    from utils.training import Trainer
+    from oepp.legacy.utils.training import Trainer
 
     TORCH_AVAILABLE = True
 except ImportError:

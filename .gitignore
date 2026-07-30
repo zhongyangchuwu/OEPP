@@ -2,6 +2,16 @@ __pycache__/
 .venv/
 .ruff_cache/
 .pytest_cache/
+.tools/
+.env
+*.key
+*.pem
 features/
 OEPP_videoclip.zip
-.tools/
+embedding_results/
+results/
+runs/
+logs/
+manifests/
+sampled_frames/
+private/

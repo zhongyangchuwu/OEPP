@@ -1,136 +1,106 @@
-# Open-Event Procedure Planning in Instructional Videos
+# Open-Event Procedure Planning
 
-*[Yilu WU]*<sup>1</sup>, 
-*[Hanlin Wang]*<sup>1</sup>, 
-*[Jing Wang]*<sup>1</sup>, 
-*[Limin Wang]*<sup>1</sup>
+OEPP is a versioned Python package for Open-Event Procedure Planning baselines, embedding experiments, and auditable hosted-MLLM evaluations.
 
-<sup>1</sup>State Key Laboratory for Novel Software Technology, Nanjing University
+High-level reviewer records, paper material, result summaries, and server operations live in the unversioned sibling `../OEPP-project/`. Historical protocol evidence remains read-only in `../OEPP_server/`.
 
-<p align = "center"> 
-<img src="img\\intro-sample.png"  width="600" />
-</p>
+## Layout
 
-**Abstract** : Given the current visual observations, the traditional procedure planning task in instructional videos requires a model to generate goal-directed plans within a given action space. 
-All previous methods for this task conduct training and inference under the same action space, and they can only plan for pre-defined events in the training set. We argue this setting is not applicable for human assistance in real lives and aim to propose a more general and practical planning paradigm. 
-Specifically, in this paper, we introduce a new task named Open-event Procedure Planning (OEPP), which extends the traditional procedure planning to the open-event setting. OEPP aims to verify whether a planner can transfer the learned knowledge to similar events that have not been seen during training. 
-We rebuild a new benchmark of OpenEvent for this task based on existing datasets and divide the events involved into base and novel parts. During the data collection process, we carefully ensure the transfer ability of procedural knowledge for base and novel events by evaluating the similarity between the descriptions of different event steps with multiple stages. 
-Based on the collected data, we further propose a simple and general framework specifically designed for OEPP, and conduct extensive study with various baseline methods, providing a detailed and insightful analysis on the results for this task.
-
-## Dataset
-Our data splits and annotations are under `data`.
-
-| **File**                             | **Description**    |
-|--------------------------------------|--------------------|
-| data/train_train_base_dataset_1.json | train dataset      |
-| data/train_val_base_dataset_1.json   | validation dataset |
-| data/novel_dataset_1.json            | test novel dataset |
-| data/test_base_dataset_1.json        | test base dataset  |
-| data/base_action_pool_1.json         | base action pool   |
-| data/novel_action_pool_1.json        | novel action pool  |
-| data/total_action_pool.json          | total action pool  |
-| data/task_info.json                  | event info         |
+```text
+src/oepp/
+  data/          split bundles, feature paths, windows, PyTorch datasets
+  models/        direct MLP/Transformer and PDPP model components
+  training/      fresh direct/PDPP runners and checkpoints
+  exports/       validation-selected embedding exporters
+  evaluation/    metrics and figures
+  api/           manifests, Table V protocol, parsing, runner, scoring
+configs/
+  training/      direct and legacy baseline configurations
+  api/           checked-in offline MLLM configurations and prompts
+data/
+  splits/        versioned split manifests and source hashes
+tests/           one package-level regression suite
+```
 
 ## Environment
 
-The repository is managed from this root by [uv](https://docs.astral.sh/uv/) and requires Python 3.10+. `pyproject.toml` and the committed `uv.lock` replace the legacy Conda/pip environment and `requirements.txt`.
+Python 3.10+ and `uv` are required. The root `pyproject.toml` and `uv.lock` are the only environment definition.
 
 ```bash
-# NVIDIA CUDA 11.8 server (training and export)
-uv sync --locked --extra cu118
-
-# CPU-only inspection, API evaluation, and non-GPU tests
+# CPU inspection and tests
 uv sync --locked --extra cpu
+
+# CUDA 11.8 training server
+uv sync --locked --extra cu118
 ```
 
-Use `uv run ...` for every repository command. The two PyTorch extras are mutually exclusive; select `cu118` for the experiment server.
+The package installs an `oepp` command. Every command below runs from the repository root.
 
-## Download features
+## Versioned data contracts
 
-The archived VideoCLIP features are required for embedding training but are not committed to Git. Download `OEPP_videoclip.zip` from the [feature archive](https://drive.google.com/drive/folders/1IKrEnPhIvQhBN-tiIvtn_bG6EtDE8bNs?usp=drive_link), then extract it into the repository-managed default location:
+`data/splits/split-001/manifest.json` freezes the canonical OEPP split-1 source paths and SHA-256 hashes. It keeps the original JSON files in place without duplicating them, while exposing named partitions and pools instead of numeric `is_val` values.
 
 ```bash
-unzip -q OEPP_videoclip.zip -d features
-# Creates features/OEPP_videoclip/<dataset>_<vid>.npy
+uv run oepp split-audit --data-root data --split-id split-001
 ```
 
-The archive must provide all 2,771 `[frames, 768]` arrays. `features/` and the zip archive are ignored by Git. To keep features outside the checkout, set `OEPP_VIDEOCLIP_ROOT=/absolute/path/to/OEPP_videoclip` before every preflight, train, and export command; that environment value overrides the default. No change to `dataset/dataset.py` is needed.
+A future shuffled event split must create a new bundle with independent provenance, record hashes, action pools, and leakage audit. It must not overwrite `split-001` or reuse its test records during train/validation construction.
 
-S3D is a separate feature protocol. Its COIN and CrossTask archives are only needed when deliberately changing the configuration from `feature: videoclip` to `feature: s3d`.
+VideoCLIP arrays are not committed. Place them under `features/OEPP_videoclip/`, or set `OEPP_VIDEOCLIP_ROOT` to an external directory. The package checks every requested feature path and its feature dimension before use.
 
-## Training
+## Fresh embedding baselines
 
-### MLP-based 
-You can run the code using the following command, and the results will be in `results/MLP`.
-
-`uv run python train.py --config=MLP_config.yaml`
-
-### Transformer-based 
-
-You can run the code using the following command, and the results will be in `results/attention`.
-
-`uv run python train.py --config=attention_config.yaml`
-
-### PDPP legacy path
-
-The original PDPP command below is retained in Git history only; it can resume a placeholder directory and previously evaluated test sets during training. Use the fresh Experiment 4 PDPP command below instead, which creates state-dict checkpoints and reserves Base/Novel evaluation for the exporter.
-
-## Experiment 4: fresh embedding analysis
-
-The legacy `train.py` and `eval.py` remain available for reproducing their original discrete metrics. For embedding analysis, train from fresh initialization with the state-dict checkpoint runner; it supports both the MLP and Transformer OEPP baselines and never selects on Base or Novel test metrics.
-
-Run this after `uv sync --locked --extra cu118`. By default it reads `features/OEPP_videoclip`; export `OEPP_VIDEOCLIP_ROOT` first when using an external directory. It verifies every annotation/action against its split pool, all expected feature file paths, action embeddings, and CUDA/Torch; it exits nonzero on any failure.
+Direct MLP and Transformer training use fresh initialization, validation-only checkpoint selection, deterministic train-sampling seed, and run metadata containing the selected split hashes.
 
 ```bash
-uv run python embedding_preflight.py \
-  --feature videoclip \
-  --verify-feature-content \
-  --output results/experiment4/preflight_videoclip.json
-uv run python -m unittest discover -s tests -v
+uv run oepp train \
+  --config configs/training/transformer.yaml \
+  --data-root data \
+  --run-dir runs/training/transformer/split-001-seed42
+
+uv run oepp export \
+  --checkpoint runs/training/transformer/split-001-seed42/best.pt \
+  --data-root data \
+  --output-dir runs/exports/transformer/split-001-seed42
 ```
-Server acceptance criteria: preflight exits 0; unit tests pass; each direct run writes `last.pt`, `best.pt`, and `selection.json`; direct export writes Base `(1138, 3, 768)` and Novel `(1691, 3, 768)` raw tensors, 3,414 / 5,073 CSV step rows, `summary_metrics.json`, and all seven named figures. PDPP must meet the same export shape/count checks in its own output directory using the documented `--sampling_seed`.
+
+PDPP is a separate diffusion runner and exporter. It uses the same named split bundle and keeps the validation checkpoint boundary intact.
 
 ```bash
-# Timing calibration only: a separate 10-epoch fresh run.
-CUDA_VISIBLE_DEVICES=0 uv run python train_embeddings.py \
-  --config attention_config.yaml \
-  --epochs 10 \
-  --run-dir results/experiment4/attention_t3_seed42_calibration
-
-# Fresh 200-epoch Transformer run.
-CUDA_VISIBLE_DEVICES=0 uv run python train_embeddings.py \
-  --config attention_config.yaml \
-  --run-dir results/experiment4/attention_t3_seed42
-
-# Fresh 200-epoch MLP comparator.
-CUDA_VISIBLE_DEVICES=0 uv run python train_embeddings.py \
-  --config MLP_config.yaml \
-  --run-dir results/experiment4/mlp_t3_seed42
-
-# Export Base/Novel continuous embeddings and all pre-specified figures.
-CUDA_VISIBLE_DEVICES=0 uv run python export_embeddings.py \
-  --checkpoint results/experiment4/attention_t3_seed42/best.pt \
-  --output-dir embedding_results/attention_t3_seed42
+uv run oepp train-pdpp --data-root data --split-id split-001 --horizon 3 --feat videoclip
+uv run oepp export-pdpp --checkpoint path/to/best.pt --data-root data
 ```
-For a legacy direct checkpoint that fails `weights_only` loading because it contains `torch.torch_version.TorchVersion`, append `--trust-checkpoint` only when it was generated by this repository and you trust its source. New runs store the Torch version as plain text and do not require this flag.
 
-PDPP is a separate stochastic model and must use a separate run/result directory. It now saves fresh `last.pt` and validation-selected `best.pt`; do not pass `--resume` for a new run and do not pass `--test_during_training`.
+The historical discrete-metric scripts remain explicitly isolated under `oepp.legacy`; they are not used by the fresh embedding runners.
+
+## Hosted-MLLM evaluation
+
+The API evaluator is `oepp.api`, not a nested project. It retains the audited Table V legacy adapter, including prompt version, candidate order, parser, failure preservation, and separate `paper_compatible` / `strict` scores.
+
+Checked-in API configurations are offline:
+
+```yaml
+api_enabled: false
+max_calls: 0
+```
+
+Copy `configs/api/.env.example` to the ignored root `.env`; keep credentials only in environment variables or that ignored file. Any run above ten calls requires a private approval artifact. Never enable a public configuration in place.
 
 ```bash
-CUDA_VISIBLE_DEVICES=0 uv run python pdpp_train.py \
-  --gpu 0 \
-  --checkpoint_root results/experiment4/pdpp_checkpoints \
-  --checkpoint_dir pdpp_t3_seed217 \
-  --log_root results/experiment4/pdpp_logs \
-  --horizon 3 --feat videoclip --split 1 --is_pad 1 \
-  --para_mse 0.2 --para_ce 1.0 --lr 0.0005 \
-  --batch_size 32 --batch_size_val 32 --epochs 200 \
-  --num_thread_reader 4 --pin_memory --evaluate --sampling_seed 42
-
-CUDA_VISIBLE_DEVICES=0 uv run python export_pdpp_embeddings.py \
-  --checkpoint results/experiment4/pdpp_checkpoints/pdpp_t3_seed217/best.pt \
-  --output-dir embedding_results/pdpp_t3_seed217 \
-  --sampling_seed 42
+uv run oepp api-build-manifest --help
+uv run oepp api-build-tablev --help
+uv run oepp api-run --help
+uv run oepp api-evaluate --help
 ```
 
-Before a server run, verify CUDA/Torch, write access, the four annotation JSON files, and the resolved VideoCLIP root (`features/OEPP_videoclip` by default or `OEPP_VIDEOCLIP_ROOT`). No dataset conversion is required: `Seq_action` reads the original annotations and precomputed feature files. The embedding path records stable source-window metadata and rejects an action absent from its selected pool. `matplotlib==3.8.3` is required for the figures.
+API requests, responses, manifests, sampled frames, logs, checkpoints, and exports are ignored under `runs/` or other ignored artifact paths. They are never committed.
+
+## Tests and quality checks
+
+```bash
+uv run python -m unittest discover -s tests -t . -v
+uv run ruff check src tests
+uv run ruff format --check src tests
+```
+
+Tests cover split-bundle hashes and windows, feature resolution, checkpoint selection, export alignment, PDPP single-GPU behavior, candidate ordering, API safety, parser behavior, Table V frame protocol, and dual scoring.

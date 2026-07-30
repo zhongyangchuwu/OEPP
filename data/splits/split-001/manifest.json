@@ -1,0 +1,26 @@
+{
+  "schema": "oepp-split-bundle-v1",
+  "split_id": "split-001",
+  "description": "Canonical OEPP split 1; paths point to the original repository data files without duplicating them.",
+  "provenance": {
+    "kind": "canonical_paper_split",
+    "shuffle_seed": null,
+    "source": "OEPP repository data files"
+  },
+  "partitions": {
+    "train": {"path": "../../train_train_base_dataset_1.json", "sha256": "fe0b28b2a0415a8d66152ed1c588d67b2e81c429e82cc4d39af96e456c213bd3"},
+    "validation": {"path": "../../train_val_base_dataset_1.json", "sha256": "2fe63cecd91013e22f27b9fff0700be37390744ce992c2e7c4dd2e3b2b69d55d"},
+    "base_test": {"path": "../../test_base_dataset_1.json", "sha256": "5219e6da71900935b0e6be44fdb36c0b20dbbfeaee91b0b12bb58373a8e2298d"},
+    "novel_test": {"path": "../../novel_dataset_1.json", "sha256": "3ede1b8e76bd84cceac657c553fcbf27043ee724a69976d46ddb1c55c82d5ea9"}
+  },
+  "action_pools": {
+    "base": {"path": "../../base_action_pool_1.json", "sha256": "be8934b93b1ed62ee8c5e0c68017453be8efabd242583f9c6245835998896db5"},
+    "novel": {"path": "../../novel_action_pool_1.json", "sha256": "c839eeb2a7743cf33de6ed086fd2089ba9956566be97c042d88c5b4b05417a77"},
+    "total": {"path": "../../total_action_pool.json", "sha256": "80f68bac37b90582610988254da36afc36e2f7760b10694d5243e9068214a9e5"}
+  },
+  "task_info": {"path": "../../task_info.json", "sha256": "be3777da32bac9a0cf0928a59396097ded576446567b9e41e94a24f5e6de1c0e"},
+  "action_embeddings": {
+    "videoclip": {"path": "../../vc_action_feat_dict.json", "sha256": "236e4982a7429688be564c523ed6d8b51581b4924aaf509defeeb61937aa2612"},
+    "s3d": {"path": "../../s3d_action_feat_dict.json", "sha256": "183cae803bc3681e2bfb0637a5f5944ccdfd0d158362816c2410adad55509721"}
+  }
+}

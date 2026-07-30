@@ -6,7 +6,7 @@ from pathlib import Path
 try:
     import torch
 
-    from embedding_support import (
+    from oepp.training.support import (
         DIRECT_CHECKPOINT_FORMAT,
         load_direct_checkpoint,
         save_direct_checkpoint,

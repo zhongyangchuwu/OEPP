@@ -1,69 +1,48 @@
-import json
 import os
-import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-import numpy as np
-
-from dataset.dataset import Video
-from feature_paths import (
-    DEFAULT_VIDEOCLIP_ROOT,
-    VIDEOCLIP_ROOT_ENV,
-    videoclip_feature_path,
-    videoclip_root,
-)
+from oepp.data import FeatureKind, FeatureRoots, feature_dimension, resolve_feature_path
+from oepp.data.features import VIDEOCLIP_ROOT_ENV, default_videoclip_root, repository_root
 
 
-class VideoCLIPPathTests(unittest.TestCase):
+class FeaturePathTests(unittest.TestCase):
     def test_repository_default_is_machine_independent(self) -> None:
         with patch.dict(os.environ, {VIDEOCLIP_ROOT_ENV: ""}, clear=False):
-            self.assertEqual(videoclip_root(), DEFAULT_VIDEOCLIP_ROOT)
+            self.assertEqual(
+                default_videoclip_root(), repository_root() / "features" / "OEPP_videoclip"
+            )
 
-    def test_environment_override_controls_dataset_and_preflight_path(self) -> None:
+    def test_environment_override_controls_videoclip_root(self) -> None:
         configured_root = Path("/mnt/feature-store/videoclip")
         with patch.dict(os.environ, {VIDEOCLIP_ROOT_ENV: str(configured_root)}):
-            self.assertEqual(videoclip_root(), configured_root)
-            self.assertEqual(
-                videoclip_feature_path("COIN", "example-video"),
-                configured_root / "COIN_example-video.npy",
-            )
+            self.assertEqual(default_videoclip_root(), configured_root)
 
-    def test_explicit_root_overrides_environment(self) -> None:
-        explicit_root = Path("/tmp/explicit-videoclip-root")
-        with patch.dict(os.environ, {VIDEOCLIP_ROOT_ENV: "/ignored"}):
-            self.assertEqual(videoclip_root(explicit_root), explicit_root)
+    def test_resolver_uses_feature_specific_canonical_paths(self) -> None:
+        record = {
+            "dataset": "COIN",
+            "vid": "sample",
+            "task_name": "Example",
+            "task_id_old": 42,
+        }
+        roots = FeatureRoots(
+            videoclip=Path("/features/videoclip"),
+            coin_s3d=Path("/features/coin-s3d"),
+            crosstask_s3d=Path("/features/crosstask-s3d"),
+        )
+        self.assertEqual(
+            resolve_feature_path(record, FeatureKind.VIDEOCLIP, roots),
+            Path("/features/videoclip/COIN_sample.npy"),
+        )
+        self.assertEqual(
+            resolve_feature_path(record, FeatureKind.S3D, roots),
+            Path("/features/coin-s3d/Example_42_sample.npy"),
+        )
 
-    def test_video_loader_uses_configured_feature_root(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            temporary_root = Path(temporary)
-            data_root = temporary_root / "data"
-            feature_root = temporary_root / "features"
-            data_root.mkdir()
-            feature_root.mkdir()
-            (data_root / "train_train_base_dataset_1.json").write_text(
-                json.dumps(
-                    [
-                        {
-                            "dataset": "COIN",
-                            "vid": "sample",
-                            "anno": [{"segment": [0, 3], "action": "first"}],
-                        }
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            np.save(feature_root / "COIN_sample.npy", np.ones((4, 768), dtype=np.float32))
-
-            with patch.dict(os.environ, {VIDEOCLIP_ROOT_ENV: str(feature_root)}):
-                dataset = Video(str(data_root), split=1, feat="videoclip")
-                vid, starts, ends, actions = dataset[0]
-
-            self.assertEqual(vid, "sample")
-            self.assertEqual(actions, ["first"])
-            self.assertEqual(starts[0].shape[0], 3 * 768)
-            self.assertEqual(ends[0].shape[0], 3 * 768)
+    def test_feature_dimensions_are_protocol_specific(self) -> None:
+        self.assertEqual(feature_dimension("videoclip"), 768)
+        self.assertEqual(feature_dimension("s3d"), 512)
 
 
 if __name__ == "__main__":
