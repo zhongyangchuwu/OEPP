@@ -16,6 +16,7 @@ COMMAND_MODULES = {
     "train-pdpp": "oepp.training.pdpp",
     "export": "oepp.exports.direct",
     "export-pdpp": "oepp.exports.pdpp",
+    "kepp-preflight": "oepp.baselines.kepp",
     "api-build-manifest": "oepp.api.build_manifest",
     "api-build-tablev": "oepp.api.build_tablev_manifest",
     "api-extract-tablev": "oepp.api.extract_tablev_frames",

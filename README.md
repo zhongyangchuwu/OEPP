@@ -73,6 +73,18 @@ uv run oepp export-pdpp --checkpoint path/to/best.pt --data-root data
 
 The historical discrete-metric scripts remain explicitly isolated under `oepp.legacy`; they are not used by the fresh embedding runners.
 
+## KEPP compatibility preflight
+
+`kepp-preflight` is a local-only gate, not an implementation or training command. It constructs a deterministic PKG from `train` annotations only, audits action-class coverage per partition, and reports protocol blockers without executing or vendoring upstream KEPP code.
+
+```bash
+uv run oepp kepp-preflight --data-root data --split-id split-001 --feature videoclip \
+  --output runs/preflight/kepp-split-001.json
+```
+
+Exit code `2` means the adapter is blocked; treat its JSON report as an approval input, not a failed training run. A full report is written only with `--output`; console output is bounded to the compatibility summary.
+
+
 ## Hosted-MLLM evaluation
 
 The API evaluator is `oepp.api`, not a nested project. It retains the audited Table V legacy adapter, including prompt version, candidate order, parser, failure preservation, and separate `paper_compatible` / `strict` scores.
