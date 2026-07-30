@@ -39,7 +39,7 @@ Address the three experimentally actionable reviewer gaps without changing the O
 3. Establish fresh initialisation, validation-only checkpoint selection, and Base/Novel export/evaluation evidence for every portable method.
 4. If a method is not portable, record the precise incompatibility and do not replace it with an unlabelled approximation.
 
-**Status:** upstream feasibility audit is the active next task; server training is deferred until a portable, validation-safe mapping is established.
+**Status:** static feasibility audit complete at `.planning/P3IV-KEPP-FEASIBILITY.md`; server training remains blocked until a portable, validation-safe mapping and its required feature provenance are established.
 
 ### Phase 3: Alternate split robustness matrix — Priority B
 

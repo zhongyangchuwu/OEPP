@@ -36,3 +36,7 @@ The account-visible SiliconFlow models query on 2026-07-30 returned six Qwen3.5 
 ## Qwen3.5 execution outcome
 
 The non-thinking 2 Base + 2 Novel pilot satisfied the transport/format gate. The approved sequential full run completed on 2026-07-30: Base 855 / 855 API success and Novel 1,294 / 1,297 API success. The three Novel HTTP 503 failures and all candidate-pool failures remain in the scoring denominators. `paper_compatible` is Base `2.22/29.04/36.29` and Novel `7.71/35.87/59.80`; `strict` is Base `2.22/28.51/35.78` and Novel `7.71/35.74/59.66` (SR/Acc/mIoU). Full audit: `oepp_api_eval/runs/siliconflow_qwen35_397b_full_audit_20260730.json`.
+
+## P3IV and KEPP feasibility record
+
+The static upstream audit is recorded in `.planning/P3IV-KEPP-FEASIBILITY.md`. KEPP has compatible CrossTask/COIN lineage but requires a train-only knowledge-graph pipeline and verified feature/action adapters. P3IV hard-codes a 512-D S3D + 128-D audio input and 106-way CrossTask action head, so an OEPP result requires an explicitly named adapter and cannot be represented as an unmodified upstream run. No valid training result exists while server feature provenance is unavailable.
