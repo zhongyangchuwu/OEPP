@@ -24,6 +24,7 @@ COMMAND_MODULES = {
     "api-run": "oepp.api.run",
     "api-evaluate": "oepp.api.evaluate",
     "api-summary": "oepp.api.summarize_results",
+    "api-replay-tablev": "oepp.api.replay_tablev",
     "api-smoke": "oepp.api.smoke_test",
 }
 

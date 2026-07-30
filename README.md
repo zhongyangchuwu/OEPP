@@ -105,6 +105,19 @@ uv run oepp api-run --help
 uv run oepp api-evaluate --help
 ```
 
+### Offline Table V T=3 preparation
+
+The Table V adapter supports only the audited legacy horizons `T=3` and `T=4`; it always keeps three start and three goal images with offsets `start_f+[0,1,2]` and `end_f+[-2,-1,0]`. Parameterizing `T` does not authorize a provider call.
+
+```bash
+uv run oepp api-extract-tablev --horizon 3 --help
+uv run oepp api-build-tablev --horizon 3 --help
+uv run oepp api-replay-tablev --horizon 3 --help
+```
+
+`api-replay-tablev` converts legacy action-list artifacts into the current frozen split/window contract and reports `paper_compatible` and `strict` separately. It never transmits images or calls an API. Coverage remains explicit: historical rows absent from a source-window set are reported, not invented or silently scored.
+
+
 API requests, responses, manifests, sampled frames, logs, checkpoints, and exports are ignored under `runs/` or other ignored artifact paths. They are never committed.
 
 ## Tests and quality checks

@@ -6,9 +6,10 @@ from pathlib import Path
 from PIL import Image
 
 from oepp.api.build_tablev_manifest import build_manifest
-from oepp.api.extract_tablev_frames import PROTOCOL_ID, extract
+from oepp.api.extract_tablev_frames import extract
 from oepp.api.parsing import LEGACY_NUMBERED_ACTION_NAMES
 from oepp.api.run import TABLE_V_LEGACY_PROMPT_MODE, _prepare_request
+from oepp.api.tablev import protocol_id
 
 
 class TableVManifestTests(unittest.TestCase):
@@ -35,7 +36,7 @@ class TableVManifestTests(unittest.TestCase):
             "end_f": 39.0,
             "action_list": self.actions,
             "image_setting": "3+3",
-            "protocol": PROTOCOL_ID,
+            "protocol": protocol_id(4),
             "frame_timestamps": {"start": [0.0, 1.0, 2.0], "goal": [37.0, 38.0, 39.0]},
             "start_images": ["base/start_1.jpg", "base/start_2.jpg", "base/start_3.jpg"],
             "end_images": ["base/goal_1.jpg", "base/goal_2.jpg", "base/goal_3.jpg"],
@@ -56,6 +57,40 @@ class TableVManifestTests(unittest.TestCase):
         self.assertEqual(manifest[0]["event"], "Example event")
         self.assertEqual(manifest[0]["gt_action_ids"], [0, 1, 2, 3])
         self.assertEqual(manifest[0]["response_parser"], LEGACY_NUMBERED_ACTION_NAMES)
+
+    def test_builds_t3_manifest_with_a_t3_protocol_identity(self) -> None:
+        actions = self.actions[:3]
+        record = {
+            **self.record,
+            "anno": [
+                {"action": action, "segment": [index * 10.0, index * 10.0 + 9.0]}
+                for index, action in enumerate(actions)
+            ],
+        }
+        observation = self._observation()
+        observation.update(
+            {
+                "sample_id": "tablev_T3_base_0000_video-1",
+                "end_f": 29.0,
+                "action_list": actions,
+                "protocol": protocol_id(3),
+                "frame_timestamps": {
+                    "start": [0.0, 1.0, 2.0],
+                    "goal": [27.0, 28.0, 29.0],
+                },
+            }
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            frame_root = Path(temporary)
+            for relative_path in [*observation["start_images"], *observation["end_images"]]:
+                path = frame_root / relative_path
+                path.parent.mkdir(parents=True, exist_ok=True)
+                Image.new("RGB", (8, 8), color="blue").save(path)
+            manifest = build_manifest(
+                [observation], [record], actions, frame_root, "base", horizon=3
+            )
+        self.assertEqual(manifest[0]["T"], 3)
+        self.assertEqual(manifest[0]["protocol"], protocol_id(3))
 
     def test_preserves_whitespace_only_candidate_aliases(self) -> None:
         self.actions = [
@@ -107,6 +142,30 @@ class TableVManifestTests(unittest.TestCase):
         self.assertEqual(observations, [])
         self.assertEqual(len(unavailable), 1)
         self.assertEqual(unavailable[0]["error_type"], "FileNotFoundError")
+
+    def test_records_t3_missing_source_video_with_a_t3_sample_id(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            sequence_file = root / "sequences.json"
+            sequence_file.write_text(
+                json.dumps(
+                    [
+                        {
+                            "vid": "missing-video",
+                            "video_path": str(root / "missing.mp4"),
+                            "start_f": 0.0,
+                            "end_f": 5.0,
+                            "action_list": self.actions[:3],
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            observations, unavailable = extract(
+                sequence_file, "base", root / "frames", None, horizon=3
+            )
+        self.assertEqual(observations, [])
+        self.assertEqual(unavailable[0]["sample_id"], "tablev_T3_base_0000_missing-video")
 
 
 class TableVRequestTests(unittest.TestCase):

@@ -9,71 +9,13 @@ from PIL import Image
 from oepp.data import ActionPool, Partition, SplitBundle
 
 from .common import load_jsonl, write_jsonl
-from .extract_tablev_frames import HORIZON, PROTOCOL_ID
-
-
-def _action_key(action: str) -> str:
-    return "".join(action.casefold().split())
-
-
-def _window_key(
-    vid: str, start: float, end: float, actions: list[str]
-) -> tuple[str, float, float, tuple[str, ...]]:
-    return vid, round(start, 6), round(end, 6), tuple(actions)
-
-
-def _annotation_windows(record: dict[str, Any]) -> list[dict[str, Any]]:
-    annotations = record.get("anno")
-    if not isinstance(annotations, list) or not annotations:
-        raise ValueError(f"{record.get('vid', '<unknown>')} has no annotations")
-    actions = [step.get("action") for step in annotations]
-    if not all(isinstance(action, str) for action in actions):
-        raise ValueError(f"{record.get('vid', '<unknown>')} annotations have invalid actions")
-    segments = [step.get("segment") for step in annotations]
-    if not all(
-        isinstance(segment, list)
-        and len(segment) == 2
-        and all(isinstance(timestamp, (int, float)) for timestamp in segment)
-        for segment in segments
-    ):
-        raise ValueError(f"{record.get('vid', '<unknown>')} annotations have invalid segments")
-    windows: list[dict[str, Any]] = []
-    if len(actions) >= HORIZON:
-        for start_step in range(len(actions) - HORIZON + 1):
-            end_step = start_step + HORIZON - 1
-            windows.append(
-                {
-                    "start_step": start_step,
-                    "end_step": end_step,
-                    "start_f": float(segments[start_step][0]),
-                    "end_f": float(segments[end_step][1]),
-                    "action_list": actions[start_step : end_step + 1],
-                }
-            )
-    else:
-        windows.append(
-            {
-                "start_step": 0,
-                "end_step": len(actions) - 1,
-                "start_f": float(segments[0][0]),
-                "end_f": float(segments[-1][1]),
-                "action_list": [actions[0]] * (HORIZON - len(actions)) + actions,
-            }
-        )
-    return windows
-
-
-def _window_index(
-    records: list[dict[str, Any]],
-) -> dict[tuple[str, float, float, tuple[str, ...]], list[dict[str, Any]]]:
-    index: dict[tuple[str, float, float, tuple[str, ...]], list[dict[str, Any]]] = {}
-    for record in records:
-        for window in _annotation_windows(record):
-            key = _window_key(
-                record["vid"], window["start_f"], window["end_f"], window["action_list"]
-            )
-            index.setdefault(key, []).append({**record, **window})
-    return index
+from .tablev import (
+    DEFAULT_HORIZON,
+    annotation_window_index,
+    protocol_id,
+    require_horizon,
+    window_key,
+)
 
 
 def _resolved_image_paths(observation: dict[str, Any], frame_root: Path, key: str) -> list[str]:
@@ -115,8 +57,10 @@ def build_manifest(
     action_pool: list[str],
     frame_root: Path,
     split: str,
+    horizon: int = DEFAULT_HORIZON,
 ) -> list[dict[str, Any]]:
-    windows = _window_index(records)
+    horizon = require_horizon(horizon)
+    windows = annotation_window_index(records, horizon)
     candidates = _candidate_actions(action_pool)
     action_to_id = {candidate["text"]: candidate["id"] for candidate in candidates}
     manifest: list[dict[str, Any]] = []
@@ -124,8 +68,10 @@ def build_manifest(
     for observation in observations:
         if not isinstance(observation, dict):
             raise ValueError("observation index must contain JSON objects")
-        if observation.get("protocol") != PROTOCOL_ID:
-            raise ValueError(f"{observation.get('sample_id')} does not use protocol {PROTOCOL_ID}")
+        if observation.get("protocol") != protocol_id(horizon):
+            raise ValueError(
+                f"{observation.get('sample_id')} does not use protocol {protocol_id(horizon)}"
+            )
         if observation.get("split") != split or observation.get("image_setting") != "3+3":
             raise ValueError(
                 f"{observation.get('sample_id')} has an incompatible split or image setting"
@@ -137,10 +83,10 @@ def build_manifest(
         action_list = observation.get("action_list")
         if (
             not isinstance(action_list, list)
-            or len(action_list) != HORIZON
+            or len(action_list) != horizon
             or not all(isinstance(action, str) for action in action_list)
         ):
-            raise ValueError(f"{sample_id} must contain exactly {HORIZON} action strings")
+            raise ValueError(f"{sample_id} must contain exactly {horizon} action strings")
         if any(action not in action_to_id for action in action_list):
             raise ValueError(f"{sample_id} ground truth is outside the {split} action pool")
         vid, start_f, end_f = (
@@ -154,7 +100,7 @@ def build_manifest(
             or not isinstance(end_f, (int, float))
         ):
             raise ValueError(f"{sample_id} has invalid sequence identity")
-        matched = windows.get(_window_key(vid, float(start_f), float(end_f), action_list), [])
+        matched = windows.get(window_key(vid, float(start_f), float(end_f), action_list), [])
         if len(matched) != 1:
             raise ValueError(
                 f"{sample_id} matches {len(matched)} annotation windows; expected exactly one"
@@ -167,7 +113,7 @@ def build_manifest(
                 "dataset": source["dataset"],
                 "event": source["task_name"],
                 "split": split,
-                "T": HORIZON,
+                "T": horizon,
                 "window_start_step": source["start_step"],
                 "window_end_step": source["end_step"],
                 "image_setting": "3+3",
@@ -182,7 +128,7 @@ def build_manifest(
                 "candidate_pool_source_size": len(action_pool),
                 "candidate_pool_effective_size": len(candidates),
                 "candidate_name_normalization": "casefold_whitespace_for_matching",
-                "protocol": PROTOCOL_ID,
+                "protocol": protocol_id(horizon),
                 "response_parser": "legacy_numbered_action_names",
                 "source_sequence_index": observation["sequence_index"],
                 "source_video_path": observation["source_video_path"],
@@ -195,7 +141,7 @@ def build_manifest(
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
-            "Build a local, validated manifest from extracted OEPP Table V T=4, 3+3 observations."
+            "Build a local, validated manifest from extracted OEPP Table V 3+3 observations."
         )
     )
     parser.add_argument("--observations", type=Path, required=True)
@@ -203,6 +149,7 @@ def main() -> None:
     parser.add_argument("--split-id", default="split-001")
     parser.add_argument("--frame-root", type=Path, required=True)
     parser.add_argument("--split", choices=("base", "novel"), required=True)
+    parser.add_argument("--horizon", type=int, choices=(3, 4), default=DEFAULT_HORIZON)
     parser.add_argument("--output", type=Path, required=True)
     arguments = parser.parse_args()
     bundle = SplitBundle.load(arguments.data_root, arguments.split_id)
@@ -216,6 +163,7 @@ def main() -> None:
         action_pool,
         arguments.frame_root,
         arguments.split,
+        arguments.horizon,
     )
     write_jsonl(arguments.output, manifest)
     print(f"Wrote {len(manifest)} records to {arguments.output}")

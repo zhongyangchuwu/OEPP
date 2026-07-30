@@ -7,17 +7,10 @@ from typing import Any
 from PIL import Image
 
 from .common import load_json, utc_now, write_jsonl
-
-PROTOCOL_ID = "table_v_t4_3x3_legacy_v1"
-HORIZON = 4
-FRAME_OFFSETS = {"start": (0, 1, 2), "goal": (-2, -1, 0)}
+from .tablev import DEFAULT_HORIZON, FRAME_OFFSETS, protocol_id, require_horizon, sample_id
 
 
-def _sample_id(split: str, index: int, record: dict[str, Any]) -> str:
-    return f"tablev_T4_{split}_{index:04d}_{record['vid']}"
-
-
-def _validate_sequence(record: Any) -> dict[str, Any]:
+def _validate_sequence(record: Any, horizon: int) -> dict[str, Any]:
     if not isinstance(record, dict):
         raise ValueError("sequence entry must be a JSON object")
     required = {"vid", "video_path", "start_f", "end_f", "action_list"}
@@ -33,10 +26,10 @@ def _validate_sequence(record: Any) -> dict[str, Any]:
     actions = record["action_list"]
     if (
         not isinstance(actions, list)
-        or len(actions) != HORIZON
+        or len(actions) != horizon
         or not all(isinstance(action, str) for action in actions)
     ):
-        raise ValueError(f"sequence action_list must contain exactly {HORIZON} strings")
+        raise ValueError(f"sequence action_list must contain exactly {horizon} strings")
     return record
 
 
@@ -88,7 +81,7 @@ def _write_image(image: Image.Image, destination: Path) -> None:
 
 
 def _extract_observation(
-    record: dict[str, Any], split: str, index: int, frame_root: Path
+    record: dict[str, Any], split: str, index: int, frame_root: Path, horizon: int
 ) -> dict[str, Any]:
     source_video = Path(record["video_path"])
     if not source_video.is_file():
@@ -97,8 +90,8 @@ def _extract_observation(
     capture = cv2.VideoCapture(str(source_video))
     if not capture.isOpened():
         raise ValueError(f"cannot open source video: {source_video}")
-    sample_id = _sample_id(split, index, record)
-    output_dir = frame_root / split / sample_id
+    record_sample_id = sample_id(split, index, record, horizon)
+    output_dir = frame_root / split / record_sample_id
     paths: dict[str, list[str]] = {"start": [], "goal": []}
     timestamps: dict[str, list[float]] = {"start": [], "goal": []}
     anchors = {"start": float(record["start_f"]), "goal": float(record["end_f"])}
@@ -114,7 +107,7 @@ def _extract_observation(
     finally:
         capture.release()
     return {
-        "sample_id": sample_id,
+        "sample_id": record_sample_id,
         "split": split,
         "sequence_index": index,
         "vid": record["vid"],
@@ -123,7 +116,7 @@ def _extract_observation(
         "end_f": float(record["end_f"]),
         "action_list": record["action_list"],
         "image_setting": "3+3",
-        "protocol": PROTOCOL_ID,
+        "protocol": protocol_id(horizon),
         "frame_offsets": FRAME_OFFSETS,
         "frame_timestamps": timestamps,
         "start_images": paths["start"],
@@ -133,8 +126,13 @@ def _extract_observation(
 
 
 def extract(
-    sequence_file: Path, split: str, frame_root: Path, limit: int | None
+    sequence_file: Path,
+    split: str,
+    frame_root: Path,
+    limit: int | None,
+    horizon: int = DEFAULT_HORIZON,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    horizon = require_horizon(horizon)
     records = load_json(sequence_file)
     if not isinstance(records, list):
         raise ValueError("sequence file must contain a JSON list")
@@ -143,15 +141,15 @@ def extract(
     observations: list[dict[str, Any]] = []
     unavailable: list[dict[str, Any]] = []
     for index, raw_record in enumerate(records):
-        sample_id = f"tablev_T4_{split}_{index:04d}"
+        record_sample_id = f"tablev_T{horizon}_{split}_{index:04d}"
         try:
-            record = _validate_sequence(raw_record)
-            sample_id = _sample_id(split, index, record)
-            observations.append(_extract_observation(record, split, index, frame_root))
+            record = _validate_sequence(raw_record, horizon)
+            record_sample_id = sample_id(split, index, record, horizon)
+            observations.append(_extract_observation(record, split, index, frame_root, horizon))
         except (OSError, RuntimeError, ValueError) as error:
             unavailable.append(
                 {
-                    "sample_id": sample_id,
+                    "sample_id": record_sample_id,
                     "split": split,
                     "sequence_index": index,
                     "status": "unavailable_observation",
@@ -164,11 +162,12 @@ def extract(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Extract the exact T=4, 3+3 observations used by the OEPP Table V GPT protocol."
+        description="Extract exact Table V 3+3 observations for T=3 or T=4."
     )
     parser.add_argument("--sequence-file", type=Path, required=True)
     parser.add_argument("--split", choices=("base", "novel"), required=True)
     parser.add_argument("--frame-root", type=Path, required=True)
+    parser.add_argument("--horizon", type=int, choices=(3, 4), default=DEFAULT_HORIZON)
     parser.add_argument("--observations-output", type=Path, required=True)
     parser.add_argument("--unavailable-output", type=Path, required=True)
     parser.add_argument("--limit", type=int)
@@ -176,7 +175,11 @@ def main() -> None:
     if arguments.limit is not None and arguments.limit <= 0:
         parser.error("--limit must be positive")
     observations, unavailable = extract(
-        arguments.sequence_file, arguments.split, arguments.frame_root, arguments.limit
+        arguments.sequence_file,
+        arguments.split,
+        arguments.frame_root,
+        arguments.limit,
+        arguments.horizon,
     )
     write_jsonl(arguments.observations_output, observations)
     write_jsonl(arguments.unavailable_output, unavailable)
