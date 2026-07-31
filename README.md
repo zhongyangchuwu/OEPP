@@ -2,7 +2,7 @@
 
 OEPP is a versioned Python package for Open-Event Procedure Planning baselines, embedding experiments, and auditable hosted-MLLM evaluations.
 
-High-level reviewer records, paper material, result summaries, and server operations live in the unversioned sibling `../OEPP-project/`. Historical protocol evidence remains read-only in `../OEPP_server/`.
+High-level reviewer records, paper material, result summaries, and server operations live in the unversioned sibling `../OEPP-project/`. Historical Table V protocol evidence is retained read-only at `../archive/legacy-gpt4o-evaluation/`.
 
 ## Layout
 
