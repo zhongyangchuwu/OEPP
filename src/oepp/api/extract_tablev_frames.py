@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 from pathlib import Path
 from typing import Any
 
@@ -49,19 +50,30 @@ def _resize_to_max_side(image: Image.Image, max_side: int = 512) -> Image.Image:
     return image.resize((int(width * scale), int(height * scale)), Image.Resampling.LANCZOS)
 
 
-def _read_frame(capture: Any, cv2: Any, timestamp: float) -> Image.Image:
+def _read_frame_with_metadata(
+    capture: Any, cv2: Any, timestamp: float
+) -> tuple[Image.Image, float, float | None]:
     if timestamp < 0:
         raise ValueError(f"frame timestamp must be non-negative, received {timestamp}")
     total_frames = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
     fps = float(capture.get(cv2.CAP_PROP_FPS))
     if total_frames <= 0 or fps <= 0:
         raise ValueError("video reports an invalid frame count or FPS")
-    duration = total_frames / fps
-    capture.set(cv2.CAP_PROP_POS_MSEC, min(timestamp, duration) * 1000)
+    seek_timestamp = min(timestamp, total_frames / fps)
+    capture.set(cv2.CAP_PROP_POS_MSEC, seek_timestamp * 1000)
     success, frame = capture.read()
     if not success or frame is None:
         raise ValueError(f"cannot decode a frame at {timestamp:.6f} seconds")
-    return _resize_to_max_side(Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)))
+    reported_timestamp = float(capture.get(cv2.CAP_PROP_POS_MSEC)) / 1000
+    if not math.isfinite(reported_timestamp) or reported_timestamp < 0:
+        reported_timestamp = None
+    image = _resize_to_max_side(Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)))
+    return image, seek_timestamp, reported_timestamp
+
+
+def _read_frame(capture: Any, cv2: Any, timestamp: float) -> Image.Image:
+    image, _, _ = _read_frame_with_metadata(capture, cv2, timestamp)
+    return image
 
 
 def _write_image(image: Image.Image, destination: Path) -> None:

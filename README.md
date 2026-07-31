@@ -46,6 +46,21 @@ uv run oepp split-audit --data-root data --split-id split-001
 
 A future shuffled event split must create a new bundle with independent provenance, record hashes, action pools, and leakage audit. It must not overwrite `split-001` or reuse its test records during train/validation construction.
 
+### Authoritative alternate event-split import
+
+`oepp import-alternate-split` accepts an externally authored membership JSON; it never creates a split or shuffles records. The input must declare `oepp-alternate-split-membership-v1`, the exact source split ID and ten source hashes, authority/source/event-rule provenance, and a complete, unique `(dataset, vid)` assignment for all four partitions. It derives the action pools in the frozen total-pool order and writes an immutable `data/splits/<alternate-id>/` bundle only when all gates pass.
+
+```bash
+uv run oepp import-alternate-split \
+  --data-root data \
+  --source-split-id split-001 \
+  --membership private/authoritative-alternate-membership.json \
+  --videoclip-root "$OEPP_VIDEOCLIP_ROOT" \
+  --report runs/split-audits/split-002.json
+```
+
+The import rejects duplicate or incomplete memberships, source-hash mismatch, Base/Novel event leakage, missing or malformed VideoCLIP `[frames, 768]` arrays, and any attempt to overwrite a bundle or report. Action overlap is reported rather than rejected: canonical Base/Novel pools already share action strings. It verifies the generated bundle through `SplitBundle.load`; it does not train a model or turn an unverified source into a result.
+
 VideoCLIP arrays are not committed. Place them under `features/OEPP_videoclip/`, or set `OEPP_VIDEOCLIP_ROOT` to an external directory. The package checks every requested feature path and its feature dimension before use.
 
 ## Fresh embedding baselines
@@ -85,6 +100,18 @@ uv run oepp kepp-preflight --data-root data --split-id split-001 --feature video
 Exit code `2` means the adapter is blocked; treat its JSON report as an approval input, not a failed training run. A full report is written only with `--output`; console output is bounded to the compatibility summary.
 
 
+### P3IV compatibility preflight
+
+`oepp p3iv-preflight` audits the frozen OEPP contract against the checked-out upstream P3IV surface without training, executing, copying, or adapting P3IV. It records the separate COIN and CrossTask input/class requirements, upstream split/decoder assumptions, source completeness, current feature mismatch, and train-only Novel action gap.
+
+```bash
+uv run oepp p3iv-preflight --data-root data --split-id split-001 --feature videoclip \
+  --upstream-root ../upstreams/procedure-planning \
+  --output runs/preflight/p3iv-split-001.json
+```
+
+Exit code `2` is expected while the unmodified method is blocked. A later VideoCLIP-only implementation requires an explicit adaptation decision and must not be described as upstream P3IV.
+
 ## Hosted-MLLM evaluation
 
 The API evaluator is `oepp.api`, not a nested project. It retains the audited Table V legacy adapter, including prompt version, candidate order, parser, failure preservation, and separate `paper_compatible` / `strict` scores.
@@ -105,9 +132,9 @@ uv run oepp api-run --help
 uv run oepp api-evaluate --help
 ```
 
-### Offline Table V T=3 preparation
+### Offline Table V preparation
 
-The Table V adapter supports only the audited legacy horizons `T=3` and `T=4`; it always keeps three start and three goal images with offsets `start_f+[0,1,2]` and `end_f+[-2,-1,0]`. Parameterizing `T` does not authorize a provider call.
+The audited legacy adapter supports only `T=3` and `T=4`; its 3+3 image contract uses `start_f+[0,1,2]` and `end_f+[-2,-1,0]`. Parameterizing `T` does not authorize a provider call.
 
 ```bash
 uv run oepp api-extract-tablev --horizon 3 --help
@@ -116,6 +143,20 @@ uv run oepp api-replay-tablev --horizon 3 --help
 ```
 
 `api-replay-tablev` converts legacy action-list artifacts into the current frozen split/window contract and reports `paper_compatible` and `strict` separately. It never transmits images or calls an API. Coverage remains explicit: historical rows absent from a source-window set are reported, not invented or silently scored.
+
+### Shared frame-cache preparation
+
+`api-build-video-index` resolves a read-only `(dataset, vid) → source_video_path` index against frozen annotation windows. `api-plan-frame-cache` then creates one isolated plan for the complete `T=3/T=4 × 1+1/3+3` grid without opening a video. The versioned `1+1` frame contract is `start_f+[0]` and `end_f+[0]`; `3+3` retains the legacy offsets above.
+
+```bash
+uv run oepp api-build-video-index --help
+uv run oepp api-plan-frame-cache --help
+uv run oepp api-extract-frame-cache --help
+uv run oepp api-compose-frame-cache --help
+uv run oepp api-verify-frame-cache-parity --help
+```
+
+Use a new cache ID and ignored paths (`private/` for the source index, `runs/` for plans and indexes, `sampled_frames/` for JPEGs). The extractor batches requests by source video and records every unavailable frame; the composer preserves any dependent unavailable observation. Run the composer and `api-build-tablev --frame-protocol shared-cache` once for each horizon, image setting, and Base/Novel split. Historical `T=4` frames, manifests, and runs are immutable. Before a server-wide extraction, use `api-verify-frame-cache-parity` to compare the new `T=4`, 3+3 JPEG hashes, timestamp records, image order, and frozen-window identities; no command initiates an API request.
 
 
 API requests, responses, manifests, sampled frames, logs, checkpoints, and exports are ignored under `runs/` or other ignored artifact paths. They are never committed.

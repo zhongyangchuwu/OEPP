@@ -3,11 +3,17 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Any
 
 DEFAULT_HORIZON = 4
 SUPPORTED_HORIZONS = frozenset({3, 4})
-FRAME_OFFSETS = {"start": (0, 1, 2), "goal": (-2, -1, 0)}
+IMAGE_OFFSETS = {
+    "1+1": {"start": (0,), "goal": (0,)},
+    "3+3": {"start": (0, 1, 2), "goal": (-2, -1, 0)},
+}
+FRAME_OFFSETS = IMAGE_OFFSETS["3+3"]
+SHARED_CACHE_PROTOCOL_VERSION = "shared_cache_v2"
 
 
 def require_horizon(horizon: int) -> int:
@@ -15,6 +21,41 @@ def require_horizon(horizon: int) -> int:
         supported = ", ".join(str(value) for value in sorted(SUPPORTED_HORIZONS))
         raise ValueError(f"Table V horizon must be one of {supported}, received {horizon}")
     return horizon
+
+
+def frame_offsets(image_setting: str) -> dict[str, tuple[int, ...]]:
+    try:
+        return IMAGE_OFFSETS[image_setting]
+    except KeyError as error:
+        supported = ", ".join(sorted(IMAGE_OFFSETS))
+        raise ValueError(
+            f"Table V image setting must be one of {supported}, received {image_setting}"
+        ) from error
+
+
+def image_count(image_setting: str) -> int:
+    return len(frame_offsets(image_setting)["start"])
+
+
+@dataclass(frozen=True)
+class TableVFrameProtocol:
+    """A versioned visual-input contract for one Table V horizon and image setting."""
+
+    horizon: int
+    image_setting: str
+
+    def __post_init__(self) -> None:
+        require_horizon(self.horizon)
+        frame_offsets(self.image_setting)
+
+    @property
+    def identifier(self) -> str:
+        image_tag = self.image_setting.replace("+", "x")
+        return f"table_v_t{self.horizon}_{image_tag}_{SHARED_CACHE_PROTOCOL_VERSION}"
+
+    @property
+    def offsets(self) -> dict[str, tuple[int, ...]]:
+        return frame_offsets(self.image_setting)
 
 
 def protocol_id(horizon: int) -> str:
