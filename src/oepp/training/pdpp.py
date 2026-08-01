@@ -35,6 +35,7 @@ from .pdpp_runtime import (
     save_pdpp_checkpoint,
     unwrap_model,
 )
+from .selection import is_better_pdpp_checkpoint
 from .support import write_json
 
 
@@ -273,6 +274,8 @@ def main_worker(gpu, ngpus_per_node, args):
                 "feature": feature.value,
             },
         )
+    best_metrics: dict[str, float] | None = None
+    best_epoch: int | None = None
     if args.resume:
         checkpoint_path = os.path.join(checkpoint_dir, "last.pt")
         if not os.path.isfile(checkpoint_path):
@@ -284,6 +287,11 @@ def main_worker(gpu, ngpus_per_node, args):
         model.optimizer.load_state_dict(checkpoint["optimizer"])
         model.step = checkpoint["step"]
         scheduler.load_state_dict(checkpoint["scheduler"])
+        previous_best_path = os.path.join(checkpoint_dir, "best.pt")
+        if os.path.isfile(previous_best_path):
+            previous_best = load_pdpp_checkpoint(previous_best_path, torch.device("cpu"))
+            best_metrics = dict(previous_best["validation_metrics"])
+            best_epoch = int(previous_best["epoch"])
         if args.rank == 0:
             log(f"=> resumed checkpoint '{checkpoint_path}' at epoch {checkpoint['epoch']}", args)
 
@@ -291,11 +299,6 @@ def main_worker(gpu, ngpus_per_node, args):
         raise ValueError("cudnn_benchmark is incompatible with reproducible Experiment 4 PDPP runs")
     total_batch_size = args.world_size * args.batch_size
     log(f"Starting training loop for rank: {args.rank}, total batch size: {total_batch_size}", args)
-
-    max_eva = -1
-    max_acc = -1
-    # old_max_epoch = 0
-    # save_max = os.path.join(os.path.dirname(__file__), 'save_max')
 
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
@@ -425,10 +428,12 @@ def main_worker(gpu, ngpus_per_node, args):
                 "miou2": MIoU2_meter_reduced1,
             }
             print(trajectory_success_rate_meter_reduced, acc_top1_reduced)
-            is_best = (trajectory_success_rate_meter_reduced, acc_top1_reduced) > (max_eva, max_acc)
+            is_best = is_better_pdpp_checkpoint(
+                validation_metrics, best_metrics, epoch + 1, best_epoch
+            )
             if is_best:
-                max_eva = trajectory_success_rate_meter_reduced
-                max_acc = acc_top1_reduced
+                best_metrics = validation_metrics
+                best_epoch = epoch + 1
         if args.rank == 0:
             payload = checkpoint_payload(
                 epoch=epoch + 1,
