@@ -20,6 +20,8 @@ from .features import FEATURE_DIMENSIONS, FeatureKind, default_videoclip_root
 
 ALTERNATE_MEMBERSHIP_SCHEMA = "oepp-alternate-split-membership-v1"
 ALTERNATE_IMPORT_AUDIT_SCHEMA = "oepp-alternate-split-import-audit-v1"
+DERIVED_EVENT_SPLIT_KIND = "derived_event_split"
+ALTERNATE_MEMBERSHIP_KINDS = frozenset({"authoritative_event_split", DERIVED_EVENT_SPLIT_KIND})
 _SPLIT_ID_PATTERN = re.compile(r"[a-z][a-z0-9-]*")
 
 
@@ -69,6 +71,52 @@ def _validate_split_id(split_id: object) -> str:
     return split_id
 
 
+def _validate_derived_provenance(provenance: Mapping[str, Any]) -> None:
+    derivation = provenance.get("derivation")
+    if not isinstance(derivation, Mapping):
+        raise ValueError("derived event-split provenance requires a derivation object")
+    if derivation.get("schema") != "oepp-derived-event-split-v1":
+        raise ValueError("derived event-split provenance has an unsupported derivation schema")
+    source_files = derivation.get("source_files")
+    required_sources = {
+        "base_events",
+        "novel_events",
+        "base_records",
+        "novel_records",
+        "base_train",
+        "base_test",
+    }
+    if not isinstance(source_files, Mapping) or set(source_files) != required_sources:
+        raise ValueError("derived event-split provenance requires complete source-file hashes")
+    for name, source_file in source_files.items():
+        if (
+            not isinstance(source_file, Mapping)
+            or not isinstance(source_file.get("path"), str)
+            or not source_file["path"]
+            or not isinstance(source_file.get("sha256"), str)
+            or len(source_file["sha256"]) != 64
+        ):
+            raise ValueError(f"derived event-split provenance has an invalid {name} source file")
+    fraction = derivation.get("validation_fraction")
+    if not isinstance(fraction, (int, float)) or not 0 < float(fraction) < 1:
+        raise ValueError("derived event-split provenance has an invalid validation fraction")
+    if not isinstance(derivation.get("validation_seed"), int):
+        raise ValueError("derived event-split provenance has an invalid validation seed")
+    for field in ("validation_ranking", "validation_count_rule"):
+        if not isinstance(derivation.get(field), str) or not derivation[field]:
+            raise ValueError(f"derived event-split provenance requires {field}")
+    counts = derivation.get("validation_event_counts")
+    if (
+        not isinstance(counts, Mapping)
+        or not counts
+        or not all(
+            isinstance(name, str) and name and isinstance(value, int) and value > 0
+            for name, value in counts.items()
+        )
+    ):
+        raise ValueError("derived event-split provenance requires positive validation event counts")
+
+
 def _membership_partitions(
     membership: Mapping[str, Any], source: SplitBundle
 ) -> dict[Partition, tuple[tuple[str, str], ...]]:
@@ -85,11 +133,17 @@ def _membership_partitions(
     provenance = membership.get("provenance")
     if not isinstance(provenance, Mapping):
         raise ValueError("alternate membership requires provenance")
-    if provenance.get("kind") != "authoritative_event_split":
-        raise ValueError("alternate membership provenance.kind must be authoritative_event_split")
+    kind = provenance.get("kind")
+    if not isinstance(kind, str) or kind not in ALTERNATE_MEMBERSHIP_KINDS:
+        raise ValueError(
+            "alternate membership provenance.kind must be authoritative_event_split or "
+            "derived_event_split"
+        )
     for field in ("authority", "source", "event_assignment_rule"):
         if not isinstance(provenance.get(field), str) or not provenance[field]:
             raise ValueError(f"alternate membership provenance requires non-empty {field}")
+    if kind == DERIVED_EVENT_SPLIT_KIND:
+        _validate_derived_provenance(provenance)
 
     raw_partitions = membership.get("partitions")
     if not isinstance(raw_partitions, Mapping):
@@ -328,7 +382,12 @@ def import_alternate_split(
             "schema": "oepp-split-bundle-v1",
             "split_id": split_id,
             "description": (
-                "Imported authoritative alternate OEPP event split; membership is copied verbatim."
+                "Imported derived alternate OEPP event split; membership is copied verbatim."
+                if membership["provenance"]["kind"] == DERIVED_EVENT_SPLIT_KIND
+                else (
+                    "Imported authoritative alternate OEPP event split; "
+                    "membership is copied verbatim."
+                )
             ),
             "provenance": {
                 **dict(membership["provenance"]),

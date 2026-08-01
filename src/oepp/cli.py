@@ -19,6 +19,8 @@ COMMAND_MODULES = {
     "kepp-preflight": "oepp.baselines.kepp",
     "p3iv-preflight": "oepp.baselines.p3iv",
     "import-alternate-split": "oepp.data.alternate_split",
+    "derive-alternate-split": "oepp.data.derive_alternate_split",
+    "summarize-planning-metrics": "oepp.evaluation.planning",
     "api-build-manifest": "oepp.api.build_manifest",
     "api-build-tablev": "oepp.api.build_tablev_manifest",
     "api-extract-tablev": "oepp.api.extract_tablev_frames",

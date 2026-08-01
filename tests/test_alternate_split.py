@@ -10,6 +10,7 @@ import numpy as np
 
 from oepp.data import SplitBundle
 from oepp.data.alternate_split import import_alternate_split
+from oepp.data.derive_alternate_split import derive_membership
 
 
 def _sha256(path: Path) -> str:
@@ -145,6 +146,101 @@ class AlternateSplitImportTests(unittest.TestCase):
         self.assertEqual(len(alternate.partition_records("novel_test")), 1)
         self.assertEqual(alternate.action_pool("total"), ("base action", "novel action"))
 
+    def test_derives_and_imports_an_explicit_event_stratified_validation_split(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            data_root, feature_root, records = self._source_data_root(root)
+            source = SplitBundle.load(data_root, "split-source")
+            historical = root / "historical"
+            sources = {
+                "base_events": _write_json(historical / "base-events.json", ["task-1"]),
+                "novel_events": _write_json(historical / "novel-events.json", ["task-2"]),
+                "base_records": _write_json(
+                    historical / "base-records.json",
+                    [records["train"][0], records["validation"][0], records["base_test"][0]],
+                ),
+                "novel_records": _write_json(
+                    historical / "novel-records.json", records["novel_test"]
+                ),
+                "base_train": _write_json(
+                    historical / "base-train.json", [records["train"][0], records["validation"][0]]
+                ),
+                "base_test": _write_json(historical / "base-test.json", records["base_test"]),
+            }
+            membership_path = root / "split-derived-membership.json"
+            membership = derive_membership(
+                source=source,
+                split_id="split-derived",
+                base_events_path=historical / "base-events.json",
+                novel_events_path=historical / "novel-events.json",
+                base_records_path=historical / "base-records.json",
+                novel_records_path=historical / "novel-records.json",
+                base_train_path=historical / "base-train.json",
+                base_test_path=historical / "base-test.json",
+                validation_fraction=0.2,
+                validation_seed=20260731,
+                authority="OEPP authors",
+                output=membership_path,
+            )
+            report = import_alternate_split(
+                data_root, source, membership_path, feature_root, root / "derived-report.json"
+            )
+            description = json.loads(
+                (data_root / "splits" / "split-derived" / "manifest.json").read_text(
+                    encoding="utf-8"
+                )
+            )["description"]
+        self.assertEqual(membership["provenance"]["kind"], "derived_event_split")
+        self.assertEqual(membership["provenance"]["derivation"]["validation_seed"], 20260731)
+        self.assertEqual(set(membership["provenance"]["derivation"]["source_files"]), set(sources))
+        self.assertEqual(
+            {name: len(rows) for name, rows in membership["partitions"].items()},
+            {
+                "train": 1,
+                "validation": 1,
+                "base_test": 1,
+                "novel_test": 1,
+            },
+        )
+        self.assertEqual(report["status"], "passed")
+        self.assertEqual(
+            description,
+            "Imported derived alternate OEPP event split; membership is copied verbatim.",
+        )
+
+    def test_rejects_historical_event_names_that_disagree_with_records(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            data_root, _, records = self._source_data_root(root)
+            source = SplitBundle.load(data_root, "split-source")
+            historical = root / "historical"
+            _write_json(historical / "base-events.json", ["wrong-task"])
+            _write_json(historical / "novel-events.json", ["task-2"])
+            _write_json(
+                historical / "base-records.json",
+                [records["train"][0], records["validation"][0], records["base_test"][0]],
+            )
+            _write_json(historical / "novel-records.json", records["novel_test"])
+            _write_json(
+                historical / "base-train.json", [records["train"][0], records["validation"][0]]
+            )
+            _write_json(historical / "base-test.json", records["base_test"])
+            with self.assertRaisesRegex(ValueError, "event-name lists"):
+                derive_membership(
+                    source=source,
+                    split_id="split-derived",
+                    base_events_path=historical / "base-events.json",
+                    novel_events_path=historical / "novel-events.json",
+                    base_records_path=historical / "base-records.json",
+                    novel_records_path=historical / "novel-records.json",
+                    base_train_path=historical / "base-train.json",
+                    base_test_path=historical / "base-test.json",
+                    validation_fraction=0.2,
+                    validation_seed=20260731,
+                    authority="OEPP authors",
+                    output=root / "split-derived-membership.json",
+                )
+
     def test_rejects_membership_from_a_different_source_bundle(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -155,6 +251,21 @@ class AlternateSplitImportTests(unittest.TestCase):
             membership_path = root / "membership-wrong-source.json"
             _write_json(membership_path, membership)
             with self.assertRaisesRegex(ValueError, "source_hashes do not match"):
+                import_alternate_split(
+                    data_root, source, membership_path, feature_root, root / "report.json"
+                )
+            self.assertFalse((data_root / "splits" / "split-alternate").exists())
+
+    def test_rejects_unhashable_provenance_kind(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            data_root, feature_root, records = self._source_data_root(root)
+            source = SplitBundle.load(data_root, "split-source")
+            membership = self._membership(source, records)
+            membership["provenance"]["kind"] = []
+            membership_path = root / "membership-invalid-kind.json"
+            _write_json(membership_path, membership)
+            with self.assertRaisesRegex(ValueError, "provenance.kind"):
                 import_alternate_split(
                     data_root, source, membership_path, feature_root, root / "report.json"
                 )

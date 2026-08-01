@@ -48,7 +48,7 @@ A future shuffled event split must create a new bundle with independent provenan
 
 ### Authoritative alternate event-split import
 
-`oepp import-alternate-split` accepts an externally authored membership JSON; it never creates a split or shuffles records. The input must declare `oepp-alternate-split-membership-v1`, the exact source split ID and ten source hashes, authority/source/event-rule provenance, and a complete, unique `(dataset, vid)` assignment for all four partitions. It derives the action pools in the frozen total-pool order and writes an immutable `data/splits/<alternate-id>/` bundle only when all gates pass.
+`oepp import-alternate-split` accepts an externally authored membership JSON or an explicitly derived event-split membership JSON; it never invents a partition. The input must declare `oepp-alternate-split-membership-v1`, the exact source split ID and ten source hashes, authority/source/event-rule provenance, and a complete, unique `(dataset, vid)` assignment for all four partitions. It derives the action pools in the frozen total-pool order and writes an immutable `data/splits/<alternate-id>/` bundle only when all gates pass.
 
 ```bash
 uv run oepp import-alternate-split \
@@ -60,6 +60,22 @@ uv run oepp import-alternate-split \
 ```
 
 The import rejects duplicate or incomplete memberships, source-hash mismatch, Base/Novel event leakage, missing or malformed VideoCLIP `[frames, 768]` arrays, and any attempt to overwrite a bundle or report. Action overlap is reported rather than rejected: canonical Base/Novel pools already share action strings. It verifies the generated bundle through `SplitBundle.load`; it does not train a model or turn an unverified source into a result.
+
+### Recorded event split with derived validation
+
+`oepp derive-alternate-split` is the narrow, auditable path for a recorded event reassignment that preserves Base/Novel event membership and Base test membership but omits validation membership. It validates all source files against `split-001`, requires the recorded Base train/test files to partition Base, then creates validation by a declared SHA-256 rank within each Base event. The seed, fraction, per-event counts, source paths, and source hashes are included in the membership artifact; it never touches `split-001` or runs a model.
+
+```bash
+uv run oepp derive-alternate-split --data-root data --source-split-id split-001 \
+  --split-id split-002 --base-events private/base_task_2.json \
+  --novel-events private/novel_task_2.json --base-records private/base_dataset_2.json \
+  --novel-records private/novel_dataset_2.json --base-train private/train_base_dataset_2.json \
+  --base-test private/test_base_dataset_2.json --validation-fraction 0.2 \
+  --validation-seed 20260731 --authority "OEPP authors" \
+  --output private/split-002-membership.json
+```
+
+Import the resulting artifact with `oepp import-alternate-split`, including the VideoCLIP feature audit. It is a partition-sensitivity condition, not proof of robustness to multiple model-training seeds.
 
 VideoCLIP arrays are not committed. Place them under `features/OEPP_videoclip/`, or set `OEPP_VIDEOCLIP_ROOT` to an external directory. The package checks every requested feature path and its feature dimension before use.
 
@@ -86,7 +102,16 @@ uv run oepp train-pdpp --data-root data --split-id split-001 --horizon 3 --feat 
 uv run oepp export-pdpp --checkpoint path/to/best.pt --data-root data
 ```
 
-The historical discrete-metric scripts remain explicitly isolated under `oepp.legacy`; they are not used by the fresh embedding runners.
+The historical discrete-metric scripts remain explicitly isolated under `oepp.legacy`; they are not used by the fresh embedding runners. After exporting each model, preserve the historical window-micro metrics and add a separate event-macro summary so that events with many windows do not dominate the robustness diagnostic:
+
+```bash
+uv run oepp summarize-planning-metrics \
+  --base-csv runs/exports/model/split-002/base_metrics_per_window_step.csv \
+  --novel-csv runs/exports/model/split-002/novel_metrics_per_window_step.csv \
+  --output runs/exports/model/split-002/planning_metrics.json
+```
+
+Event-macro metrics are descriptive secondary evidence. They do not participate in checkpoint selection and must not replace the predeclared window-micro Table III metrics without a stated protocol change.
 
 ## KEPP compatibility preflight
 
