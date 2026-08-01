@@ -72,6 +72,7 @@ def main() -> None:
     config = checkpoint["config"]
     data = _mapping(config.get("data"), "data")
     model_config = _mapping(config.get("model"), "model")
+    sampling = _mapping(config.get("sampling"), "sampling")
     feature = FeatureKind(str(data["feature"]))
     horizon = int(data["horizon"])
     bundle = SplitBundle.load(arguments.data_root, str(data["split_id"]))
@@ -93,11 +94,25 @@ def main() -> None:
         name: action_embedding_tensor(list(pool), embeddings, device)
         for name, pool in pools.items()
     }
+    export_seed = sampling.get("export_seed")
+    if export_seed is not None and not isinstance(export_seed, int):
+        raise ValueError("Checkpoint sampling.export_seed must be an integer when provided")
+    sampled_predictor = getattr(model, "predict_with_generator", None)
+    generator = (
+        torch.Generator(device=device.type).manual_seed(export_seed)
+        if export_seed is not None
+        else None
+    )
 
     def direct_predict(batch: object) -> torch.Tensor:
         frames = batch[3].to(device, non_blocking=True).float()
         with torch.inference_mode():
-            return stack_direct_outputs(model(frames))
+            outputs = (
+                sampled_predictor(frames, generator=generator)
+                if generator is not None and callable(sampled_predictor)
+                else model(frames)
+            )
+            return stack_direct_outputs(outputs)
 
     padding = PaddingPolicy(str(data["padding"]))
     datasets = {
@@ -150,6 +165,11 @@ def main() -> None:
             "split_source_hashes": dict(bundle.source_hashes),
             "device": str(device),
             "batch_size": arguments.batch_size,
+            "sampling": {
+                "export_seed": export_seed,
+                "sample_count": 1,
+                "aggregation": "single latent trajectory",
+            },
             "feature_roots": {"videoclip": str(roots.videoclip)},
             "splits": {name: len(dataset) for name, dataset in datasets.items()},
         },
