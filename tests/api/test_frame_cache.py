@@ -231,6 +231,158 @@ class SharedFrameCacheTests(unittest.TestCase):
         self.assertEqual(outcomes[0]["status"], "unavailable_frame")
         self.assertEqual(outcomes[0]["error_type"], "FileNotFoundError")
 
+    def test_seeds_exact_jpeg_bytes_from_legacy_observations(self) -> None:
+        request = {
+            "frame_id": "seeded-frame",
+            "dataset": "COIN",
+            "vid": "seeded-video",
+            "video_path": "/not-a-video/seeded-video.mp4",
+            "requested_timestamp": 0.0,
+            "relative_path": "frames/seeded-frame.jpg",
+        }
+        legacy = {
+            "sample_id": "legacy-sample",
+            "protocol": "table_v_t4_3x3_legacy_v1",
+            "image_setting": "3+3",
+            "source_video_path": request["video_path"],
+            "frame_timestamps": {"start": [0.0, 1.0, 2.0], "goal": [3.0, 4.0, 5.0]},
+            "start_images": ["start-0.jpg", "start-1.jpg", "start-2.jpg"],
+            "end_images": ["goal-0.jpg", "goal-1.jpg", "goal-2.jpg"],
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            legacy_root = root / "legacy"
+            for index, color in enumerate(["red", "green", "blue", "purple", "orange", "yellow"]):
+                role = "start" if index < 3 else "goal"
+                path = legacy_root / f"{role}-{index % 3}.jpg"
+                path.parent.mkdir(parents=True, exist_ok=True)
+                Image.new("RGB", (8, 8), color=color).save(path)
+            outcomes = extract_cache_frames(
+                [request],
+                root / "cache",
+                legacy_observations=[legacy],
+                legacy_frame_root=legacy_root,
+            )
+            seeded_path = root / "cache" / request["relative_path"]
+            source_path = legacy_root / "start-0.jpg"
+            self.assertEqual(seeded_path.read_bytes(), source_path.read_bytes())
+            self.assertEqual(outcomes[0]["status"], "available")
+            self.assertFalse(outcomes[0]["reused"])
+            self.assertEqual(outcomes[0]["image_sha256"], sha256_file(source_path))
+            self.assertEqual(outcomes[0]["provenance"]["kind"], "legacy_t4_3x3_frame")
+
+    def test_rejects_conflicting_legacy_jpegs_for_one_frame(self) -> None:
+        request = {
+            "frame_id": "conflicted-frame",
+            "dataset": "COIN",
+            "vid": "conflicted-video",
+            "video_path": "/not-a-video/conflicted-video.mp4",
+            "requested_timestamp": 0.0,
+            "relative_path": "frames/conflicted-frame.jpg",
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            legacy_root = root / "legacy"
+            observations = []
+            for index, color in enumerate(["red", "blue"]):
+                prefix = f"duplicate-{index}"
+                for position in range(6):
+                    path = legacy_root / f"{prefix}-{position}.jpg"
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    Image.new("RGB", (8, 8), color=color).save(path)
+                observations.append(
+                    {
+                        "sample_id": prefix,
+                        "protocol": "table_v_t4_3x3_legacy_v1",
+                        "image_setting": "3+3",
+                        "source_video_path": request["video_path"],
+                        "frame_timestamps": {"start": [0.0, 1.0, 2.0], "goal": [3.0, 4.0, 5.0]},
+                        "start_images": [f"{prefix}-0.jpg", f"{prefix}-1.jpg", f"{prefix}-2.jpg"],
+                        "end_images": [f"{prefix}-3.jpg", f"{prefix}-4.jpg", f"{prefix}-5.jpg"],
+                    }
+                )
+            with self.assertRaisesRegex(ValueError, "legacy observations disagree"):
+                extract_cache_frames(
+                    [request],
+                    root / "cache",
+                    legacy_observations=observations,
+                    legacy_frame_root=legacy_root,
+                )
+
+    def test_selects_a_deterministic_source_for_identical_legacy_jpegs(self) -> None:
+        request = {
+            "frame_id": "deterministic-frame",
+            "dataset": "COIN",
+            "vid": "deterministic-video",
+            "video_path": "/not-a-video/deterministic-video.mp4",
+            "requested_timestamp": 0.0,
+            "relative_path": "frames/deterministic-frame.jpg",
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            legacy_root = root / "legacy"
+            observations = []
+            for prefix in ("zeta", "alpha"):
+                for position in range(6):
+                    path = legacy_root / f"{prefix}-{position}.jpg"
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    Image.new("RGB", (8, 8), color="blue").save(path)
+                observations.append(
+                    {
+                        "sample_id": prefix,
+                        "protocol": "table_v_t4_3x3_legacy_v1",
+                        "image_setting": "3+3",
+                        "source_video_path": request["video_path"],
+                        "frame_timestamps": {"start": [0.0, 1.0, 2.0], "goal": [3.0, 4.0, 5.0]},
+                        "start_images": [f"{prefix}-0.jpg", f"{prefix}-1.jpg", f"{prefix}-2.jpg"],
+                        "end_images": [f"{prefix}-3.jpg", f"{prefix}-4.jpg", f"{prefix}-5.jpg"],
+                    }
+                )
+            outcomes = extract_cache_frames(
+                [request],
+                root / "cache",
+                legacy_observations=observations,
+                legacy_frame_root=legacy_root,
+            )
+            self.assertEqual(
+                outcomes[0]["provenance"]["source_path"], str(legacy_root / "alpha-0.jpg")
+            )
+
+    def test_rejects_a_non_jpeg_legacy_frame(self) -> None:
+        request = {
+            "frame_id": "non-jpeg-frame",
+            "dataset": "COIN",
+            "vid": "non-jpeg-video",
+            "video_path": "/not-a-video/non-jpeg-video.mp4",
+            "requested_timestamp": 0.0,
+            "relative_path": "frames/non-jpeg-frame.jpg",
+        }
+        legacy = {
+            "sample_id": "legacy-non-jpeg",
+            "protocol": "table_v_t4_3x3_legacy_v1",
+            "image_setting": "3+3",
+            "source_video_path": request["video_path"],
+            "frame_timestamps": {"start": [0.0, 1.0, 2.0], "goal": [3.0, 4.0, 5.0]},
+            "start_images": ["start-0.jpg", "start-1.jpg", "start-2.jpg"],
+            "end_images": ["goal-0.jpg", "goal-1.jpg", "goal-2.jpg"],
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            legacy_root = root / "legacy"
+            for index, raw_path in enumerate([*legacy["start_images"], *legacy["end_images"]]):
+                path = legacy_root / raw_path
+                path.parent.mkdir(parents=True, exist_ok=True)
+                Image.new("RGB", (8, 8), color="blue").save(
+                    path, format="PNG" if index == 0 else "JPEG"
+                )
+            with self.assertRaisesRegex(ValueError, "missing or invalid"):
+                extract_cache_frames(
+                    [request],
+                    root / "cache",
+                    legacy_observations=[legacy],
+                    legacy_frame_root=legacy_root,
+                )
+
     def test_verifies_t4_three_image_cache_parity(self) -> None:
         colors = ["red", "green", "blue", "purple", "orange", "yellow"]
         protocol = TableVFrameProtocol(4, "3+3")

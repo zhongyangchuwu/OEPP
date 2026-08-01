@@ -156,7 +156,9 @@ uv run oepp api-compose-frame-cache --help
 uv run oepp api-verify-frame-cache-parity --help
 ```
 
-Use a new cache ID and ignored paths (`private/` for the source index, `runs/` for plans and indexes, `sampled_frames/` for JPEGs). The extractor batches requests by source video and records every unavailable frame; the composer preserves any dependent unavailable observation. Run the composer and `api-build-tablev --frame-protocol shared-cache` once for each horizon, image setting, and Base/Novel split. Historical `T=4` frames, manifests, and runs are immutable. Before a server-wide extraction, use `api-verify-frame-cache-parity` to compare the new `T=4`, 3+3 JPEG hashes, timestamp records, image order, and frozen-window identities; no command initiates an API request.
+Use a new cache ID and ignored paths (`private/` for the source index, `runs/` for plans and indexes, `sampled_frames/` for JPEGs). The extractor batches requests by source video and records every unavailable frame; the composer preserves any dependent unavailable observation. Run the composer and `api-build-tablev --frame-protocol shared-cache` once for each horizon, image setting, and Base/Novel split. Historical `T=4` frames, manifests, and runs are immutable.
+
+Before a server-wide extraction, use `api-verify-frame-cache-parity` to compare the new `T=4`, 3+3 JPEG hashes, timestamp records, image order, and frozen-window identities. If the parity gate detects decoder drift, seed a fresh cache with the immutable `T=4`, 3+3 observations and frame root through `api-extract-frame-cache --legacy-observations ... --legacy-frame-root ...`. Conflicting JPEG bytes for one `(source video, timestamp)` are rejected, and no command initiates an API request.
 
 
 API requests, responses, manifests, sampled frames, logs, checkpoints, and exports are ignored under `runs/` or other ignored artifact paths. They are never committed.
