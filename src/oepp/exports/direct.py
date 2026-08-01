@@ -97,21 +97,28 @@ def main() -> None:
     export_seed = sampling.get("export_seed")
     if export_seed is not None and not isinstance(export_seed, int):
         raise ValueError("Checkpoint sampling.export_seed must be an integer when provided")
+    export_mode = str(sampling.get("export_mode", "sample"))
+    if export_mode not in {"sample", "mean"}:
+        raise ValueError("Checkpoint sampling.export_mode must be 'sample' or 'mean' when provided")
     sampled_predictor = getattr(model, "predict_with_generator", None)
+    mean_predictor = getattr(model, "predict_mean", None)
     generator = (
         torch.Generator(device=device.type).manual_seed(export_seed)
-        if export_seed is not None
+        if export_mode == "sample" and export_seed is not None
         else None
     )
 
     def direct_predict(batch: object) -> torch.Tensor:
         frames = batch[3].to(device, non_blocking=True).float()
         with torch.inference_mode():
-            outputs = (
-                sampled_predictor(frames, generator=generator)
-                if generator is not None and callable(sampled_predictor)
-                else model(frames)
-            )
+            if export_mode == "mean":
+                outputs = mean_predictor(frames) if callable(mean_predictor) else model(frames)
+            else:
+                outputs = (
+                    sampled_predictor(frames, generator=generator)
+                    if generator is not None and callable(sampled_predictor)
+                    else model(frames)
+                )
             return stack_direct_outputs(outputs)
 
     padding = PaddingPolicy(str(data["padding"]))
@@ -166,9 +173,14 @@ def main() -> None:
             "device": str(device),
             "batch_size": arguments.batch_size,
             "sampling": {
-                "export_seed": export_seed,
-                "sample_count": 1,
-                "aggregation": "single latent trajectory",
+                "export_mode": export_mode,
+                "export_seed": export_seed if export_mode == "sample" else None,
+                "sample_count": 1 if export_mode == "sample" else 0,
+                "aggregation": (
+                    "single latent trajectory"
+                    if export_mode == "sample"
+                    else "latent mean (z=0)"
+                ),
             },
             "feature_roots": {"videoclip": str(roots.videoclip)},
             "splits": {name: len(dataset) for name, dataset in datasets.items()},

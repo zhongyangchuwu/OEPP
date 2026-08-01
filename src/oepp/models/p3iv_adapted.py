@@ -114,6 +114,17 @@ class AdaptedP3IV(nn.Module):
     def forward(self, frames: torch.Tensor) -> list[torch.Tensor]:
         return self.predict_with_generator(frames)
 
+    def predict_mean(self, frames: torch.Tensor) -> list[torch.Tensor]:
+        """Return the zero-mean latent trajectory for deterministic primary evaluation."""
+        return self.predict_from_latent(
+            frames,
+            torch.zeros(
+                (frames.shape[0], self.noise_dimension),
+                device=frames.device,
+                dtype=frames.dtype,
+            ),
+        )
+
     def predict_from_latent(self, frames: torch.Tensor, latent: torch.Tensor) -> list[torch.Tensor]:
         """Predict from an explicit latent tensor for deterministic tests and diagnostics."""
         predicted = self._predict(frames, latent)

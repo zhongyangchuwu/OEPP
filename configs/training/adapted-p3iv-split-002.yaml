@@ -5,8 +5,8 @@ data:
   padding: left
 sampling:
   seed: 42
-  validation_seed: 20260801
-  export_seed: 20260802
+  validation_mode: mean
+  export_mode: mean
 training:
   batch_size: 256
   epochs: 200

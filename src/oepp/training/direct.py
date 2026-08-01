@@ -85,6 +85,9 @@ def load_config(path: Path) -> dict[str, Any]:
     for name in ("validation_seed", "export_seed"):
         if name in sampling and not isinstance(sampling[name], int):
             raise ValueError(f"sampling.{name} must be an integer when provided")
+    for name in ("validation_mode", "export_mode"):
+        if name in sampling and sampling[name] not in {"sample", "mean"}:
+            raise ValueError(f"sampling.{name} must be 'sample' or 'mean' when provided")
     for name in ("batch_size", "epochs", "lr", "weight_decay"):
         if name not in training:
             raise ValueError(f"training.{name} is required")
@@ -107,13 +110,20 @@ def _direct_predictions(
     frames: torch.Tensor,
     *,
     generator: torch.Generator | None = None,
+    prediction_mode: str = "sample",
 ) -> torch.Tensor:
     sampled_predictor = getattr(model, "predict_with_generator", None)
-    outputs = (
-        sampled_predictor(frames, generator=generator)
-        if generator is not None and callable(sampled_predictor)
-        else model(frames)
-    )
+    mean_predictor = getattr(model, "predict_mean", None)
+    if prediction_mode == "mean":
+        outputs = mean_predictor(frames) if callable(mean_predictor) else model(frames)
+    elif prediction_mode == "sample":
+        outputs = (
+            sampled_predictor(frames, generator=generator)
+            if generator is not None and callable(sampled_predictor)
+            else model(frames)
+        )
+    else:
+        raise ValueError(f"Unsupported direct prediction mode: {prediction_mode!r}")
     if not isinstance(outputs, list):
         raise TypeError("Direct OEPP model must return a list of per-step embeddings")
     return torch.stack(outputs, dim=1)
@@ -139,6 +149,7 @@ def evaluate_direct(
     device: torch.device,
     *,
     sampling_seed: int | None = None,
+    prediction_mode: str = "sample",
 ) -> dict[str, float]:
     model.eval()
     total_windows = 0
@@ -147,13 +158,18 @@ def evaluate_direct(
     total_mse = 0.0
     total_iou = 0.0
     total_sr = 0
-    generator = _sampling_generator(device, sampling_seed)
+    generator = _sampling_generator(device, sampling_seed) if prediction_mode == "sample" else None
     with torch.inference_mode():
         for batch in loader:
             frames = batch[3].to(device, non_blocking=True).float()
             ground = batch[5].to(device, non_blocking=True).float()
             labels = batch[7].to(device, non_blocking=True).long()
-            predicted = _direct_predictions(model, frames, generator=generator)
+            predicted = _direct_predictions(
+                model,
+                frames,
+                generator=generator,
+                prediction_mode=prediction_mode,
+            )
             _require_prediction_shape(predicted, ground)
             scores = functional.cosine_similarity(
                 predicted.unsqueeze(2), candidate_embeddings.unsqueeze(0).unsqueeze(0), dim=-1
@@ -212,6 +228,7 @@ def main() -> None:
     training = _mapping(config["training"], "training")
     data = _mapping(config["data"], "data")
     sampling = _mapping(config["sampling"], "sampling")
+    validation_prediction_mode = str(sampling.get("validation_mode", "sample"))
     if arguments.epochs is not None:
         if arguments.epochs <= 0:
             raise ValueError("--epochs must be positive")
@@ -296,6 +313,7 @@ def main() -> None:
         "fresh_initialization": True,
         "sampling_seed": seed,
         "validation_sampling_seed": sampling.get("validation_seed"),
+        "validation_prediction_mode": validation_prediction_mode,
         "legacy_loss_semantics": (
             "CrossEntropyLoss receives softmax(cosine/0.1), matching OEPP's published "
             "direct baseline."
@@ -344,6 +362,7 @@ def main() -> None:
             base_text_embeddings,
             device,
             sampling_seed=sampling.get("validation_seed"),
+            prediction_mode=validation_prediction_mode,
         )
         record = {
             "epoch": epoch,

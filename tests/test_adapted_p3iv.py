@@ -46,6 +46,15 @@ class AdaptedP3IVTests(unittest.TestCase):
         for expected, actual in zip(first, second):
             self.assertTrue(torch.equal(expected, actual))
 
+    def test_mean_prediction_equals_zero_latent_prediction(self) -> None:
+        self.model.eval()
+        mean_prediction = torch.stack(self.model.predict_mean(self.frames), dim=1)
+        zero_latent_prediction = torch.stack(
+            self.model.predict_from_latent(self.frames, torch.zeros(2, 4)), dim=1
+        )
+
+        self.assertTrue(torch.equal(mean_prediction, zero_latent_prediction))
+
     def test_changed_latent_changes_embedding_trajectory(self) -> None:
         self.model.eval()
         zeros = torch.zeros(2, 4)
@@ -89,6 +98,24 @@ class AdaptedP3IVTests(unittest.TestCase):
         )
 
         self.assertEqual(first, second)
+
+        mean_first = evaluate_direct(
+            self.model,
+            loader,
+            candidates,
+            torch.device("cpu"),
+            sampling_seed=29,
+            prediction_mode="mean",
+        )
+        mean_second = evaluate_direct(
+            self.model,
+            loader,
+            candidates,
+            torch.device("cpu"),
+            sampling_seed=31,
+            prediction_mode="mean",
+        )
+        self.assertEqual(mean_first, mean_second)
 
     def test_one_planner_evaluates_different_candidate_pools(self) -> None:
         samples = [
