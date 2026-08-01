@@ -1,12 +1,13 @@
 """Fail-fast server preflight for OEPP embedding experiments."""
+
 from __future__ import annotations
 
 import argparse
 import json
-import sys
 from pathlib import Path
 from typing import Any
-from feature_paths import videoclip_feature_path, videoclip_root
+
+from oepp.legacy.feature_paths import videoclip_feature_path, videoclip_root
 
 
 def parse_args() -> argparse.Namespace:
@@ -21,8 +22,12 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Feature directory; defaults to OEPP_VIDEOCLIP_ROOT or features/OEPP_videoclip.",
     )
-    parser.add_argument("--coin-s3d-root", type=Path, default=Path("/data0/wuyilu/data/COIN/full_npy"))
-    parser.add_argument("--crosstask-s3d-root", type=Path, default=Path("/data0/wuyilu/data/ori_processed_data"))
+    parser.add_argument(
+        "--coin-s3d-root", type=Path, default=Path("/data0/wuyilu/data/COIN/full_npy")
+    )
+    parser.add_argument(
+        "--crosstask-s3d-root", type=Path, default=Path("/data0/wuyilu/data/ori_processed_data")
+    )
     parser.add_argument("--output", type=Path, default=None)
     parser.add_argument(
         "--verify-feature-content",
@@ -43,10 +48,16 @@ def load_json(path: Path) -> Any:
 
 def feature_path(record: dict[str, Any], args: argparse.Namespace) -> Path:
     if args.feature == "videoclip":
-        return videoclip_feature_path(str(record["dataset"]), str(record["vid"]), args.videoclip_root)
+        return videoclip_feature_path(
+            str(record["dataset"]), str(record["vid"]), args.videoclip_root
+        )
     if record["dataset"] == "COIN":
-        return args.coin_s3d_root / f"{record['task_name']}_{record['task_id_old']}_{record['vid']}.npy"
+        return (
+            args.coin_s3d_root
+            / f"{record['task_name']}_{record['task_id_old']}_{record['vid']}.npy"
+        )
     return args.crosstask_s3d_root / f"{record['task_id_old']}_{record['vid']}.npy"
+
 
 def feature_content_error(path: Path, feature: str) -> str | None:
     try:
@@ -79,7 +90,9 @@ def main() -> None:
         "base": load_json(args.data_root / "base_action_pool_1.json"),
         "novel": load_json(args.data_root / "novel_action_pool_1.json"),
     }
-    embedding_file = args.data_root / ("vc_action_feat_dict.json" if args.feature == "videoclip" else "s3d_action_feat_dict.json")
+    embedding_file = args.data_root / (
+        "vc_action_feat_dict.json" if args.feature == "videoclip" else "s3d_action_feat_dict.json"
+    )
     action_embeddings = load_json(embedding_file)
     report: dict[str, Any] = {
         "feature": args.feature,
@@ -123,7 +136,12 @@ def main() -> None:
             "unknown_action_examples": sorted(set(unknown_actions))[:10],
             "missing_action_embedding_examples": sorted(set(missing_action_embeddings))[:10],
         }
-        if missing_features or feature_content_errors or unknown_actions or missing_action_embeddings:
+        if (
+            missing_features
+            or feature_content_errors
+            or unknown_actions
+            or missing_action_embeddings
+        ):
             report["errors"].append(f"{split_name} data contract failed")
 
     try:
