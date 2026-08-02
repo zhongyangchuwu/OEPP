@@ -8,6 +8,7 @@ from typing import Any
 
 import torch
 
+from oepp.baselines.kepp import build_adapted_kepp_graph
 from oepp.data import (
     FeatureKind,
     FeatureRoots,
@@ -81,9 +82,17 @@ def main() -> None:
         coin_s3d=arguments.coin_s3d_root,
         crosstask_s3d=arguments.crosstask_s3d_root,
     )
-    model = build_direct_model(
-        {"feature": feature.value, "horizon": horizon, "model": model_config}, device
-    )
+    model_build_config: dict[str, object] = {
+        "feature": feature.value,
+        "horizon": horizon,
+        "model": model_config,
+    }
+    kepp_graph_provenance: dict[str, object] | None = None
+    if model_config["family"] == "adapted_kepp":
+        kepp_graph = build_adapted_kepp_graph(bundle, feature, device)
+        model_build_config["kepp_graph"] = kepp_graph.model_inputs()
+        kepp_graph_provenance = dict(kepp_graph.provenance)
+    model = build_direct_model(model_build_config, device)
     model.load_state_dict(checkpoint["model_state"], strict=True)
     model.eval()
     output_dir = arguments.output_dir or (arguments.checkpoint.parent / "exports")
@@ -98,8 +107,11 @@ def main() -> None:
     if export_seed is not None and not isinstance(export_seed, int):
         raise ValueError("Checkpoint sampling.export_seed must be an integer when provided")
     export_mode = str(sampling.get("export_mode", "sample"))
-    if export_mode not in {"sample", "mean"}:
-        raise ValueError("Checkpoint sampling.export_mode must be 'sample' or 'mean' when provided")
+    if export_mode not in {"sample", "mean", "deterministic"}:
+        raise ValueError(
+            "Checkpoint sampling.export_mode must be 'sample', 'mean', or 'deterministic' "
+            "when provided"
+        )
     sampled_predictor = getattr(model, "predict_with_generator", None)
     mean_predictor = getattr(model, "predict_mean", None)
     generator = (
@@ -113,6 +125,8 @@ def main() -> None:
         with torch.inference_mode():
             if export_mode == "mean":
                 outputs = mean_predictor(frames) if callable(mean_predictor) else model(frames)
+            elif export_mode == "deterministic":
+                outputs = model(frames)
             else:
                 outputs = (
                     sampled_predictor(frames, generator=generator)
@@ -180,8 +194,11 @@ def main() -> None:
                     "single latent trajectory"
                     if export_mode == "sample"
                     else "latent mean (z=0)"
+                    if export_mode == "mean"
+                    else "deterministic model output"
                 ),
             },
+            "adapted_kepp_graph": kepp_graph_provenance,
             "feature_roots": {"videoclip": str(roots.videoclip)},
             "splits": {name: len(dataset) for name, dataset in datasets.items()},
         },

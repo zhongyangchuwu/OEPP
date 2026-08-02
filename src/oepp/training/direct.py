@@ -15,6 +15,7 @@ import torch
 import torch.nn.functional as functional
 import yaml
 
+from oepp.baselines.kepp import build_adapted_kepp_graph
 from oepp.data import (
     FeatureKind,
     FeatureRoots,
@@ -86,8 +87,10 @@ def load_config(path: Path) -> dict[str, Any]:
         if name in sampling and not isinstance(sampling[name], int):
             raise ValueError(f"sampling.{name} must be an integer when provided")
     for name in ("validation_mode", "export_mode"):
-        if name in sampling and sampling[name] not in {"sample", "mean"}:
-            raise ValueError(f"sampling.{name} must be 'sample' or 'mean' when provided")
+        if name in sampling and sampling[name] not in {"sample", "mean", "deterministic"}:
+            raise ValueError(
+                f"sampling.{name} must be 'sample', 'mean', or 'deterministic' when provided"
+            )
     for name in ("batch_size", "epochs", "lr", "weight_decay"):
         if name not in training:
             raise ValueError(f"training.{name} is required")
@@ -122,6 +125,8 @@ def _direct_predictions(
             if generator is not None and callable(sampled_predictor)
             else model(frames)
         )
+    elif prediction_mode == "deterministic":
+        outputs = model(frames)
     else:
         raise ValueError(f"Unsupported direct prediction mode: {prediction_mode!r}")
     if not isinstance(outputs, list):
@@ -286,9 +291,17 @@ def main() -> None:
     base_text_embeddings = action_embedding_tensor(
         list(base_pool), bundle.embedding_dict(feature), device
     )
-    model = build_direct_model(
-        {"feature": feature.value, "horizon": horizon, "model": config["model"]}, device
-    )
+    model_build_config: dict[str, object] = {
+        "feature": feature.value,
+        "horizon": horizon,
+        "model": config["model"],
+    }
+    kepp_graph_provenance: dict[str, object] | None = None
+    if config["model"]["family"] == "adapted_kepp":
+        kepp_graph = build_adapted_kepp_graph(bundle, feature, device)
+        model_build_config["kepp_graph"] = kepp_graph.model_inputs()
+        kepp_graph_provenance = dict(kepp_graph.provenance)
+    model = build_direct_model(model_build_config, device)
     optimizer = torch.optim.Adam(
         model.parameters(),
         lr=float(training["lr"]),
@@ -319,6 +332,8 @@ def main() -> None:
             "direct baseline."
         ),
     }
+    if kepp_graph_provenance is not None:
+        provenance["adapted_kepp_graph"] = kepp_graph_provenance
     write_json(run_dir / "run_metadata.json", provenance)
     (run_dir / "config.yaml").write_text(yaml.safe_dump(config, sort_keys=True), encoding="utf-8")
 

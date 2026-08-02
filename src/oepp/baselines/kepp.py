@@ -8,12 +8,15 @@ training run is approved.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
+
+import torch
 
 from oepp.data import ActionPool, FeatureKind, Partition, SplitBundle, feature_dimension
 
@@ -48,6 +51,62 @@ class TrainOnlyPKG:
             "edge_count": len(self.edge_counts),
             "source_record_count": self.source_record_count,
         }
+
+
+@dataclass(frozen=True)
+class AdaptedKEPPGraph:
+    """Graph tensors and immutable provenance for the native KEPP adaptation."""
+
+    action_names: tuple[str, ...]
+    node_embeddings: torch.Tensor
+    normalized_adjacency: torch.Tensor
+    provenance: Mapping[str, object]
+
+    def model_inputs(self) -> dict[str, torch.Tensor]:
+        return {
+            "node_embeddings": self.node_embeddings,
+            "normalized_adjacency": self.normalized_adjacency,
+        }
+
+
+def _sha256_tensor(tensor: torch.Tensor) -> str:
+    canonical = tensor.detach().to(device="cpu", dtype=torch.float32).contiguous()
+    return hashlib.sha256(canonical.numpy().tobytes()).hexdigest()
+
+
+def build_adapted_kepp_graph(
+    bundle: SplitBundle, feature: FeatureKind | str, device: torch.device
+) -> AdaptedKEPPGraph:
+    """Construct the native adaptation graph from Base training data only."""
+    selected_feature = FeatureKind(feature)
+    embedding_dict = bundle.embedding_dict(selected_feature)
+    base_pool = tuple(bundle.action_pool(ActionPool.BASE))
+    train_records = bundle.partition_records(Partition.TRAIN)
+    pkg = build_train_only_pkg(train_records, base_pool)
+    if tuple(sorted(pkg.action_to_id, key=pkg.action_to_id.__getitem__)) != base_pool:
+        raise ValueError("Train-only KEPP graph action IDs do not match frozen Base pool order")
+    node_vectors = [
+        torch.as_tensor(embedding_dict[action], dtype=torch.float32) for action in base_pool
+    ]
+    node_embeddings = torch.cat(node_vectors, dim=0).to(device)
+    if node_embeddings.ndim != 2 or node_embeddings.shape[0] != len(base_pool):
+        raise ValueError("Base action embeddings do not form a valid KEPP node matrix")
+    adjacency = torch.eye(len(base_pool), dtype=torch.float32, device=device)
+    for (source, target), count in pkg.edge_counts.items():
+        adjacency[pkg.action_to_id[source], pkg.action_to_id[target]] += count
+    normalized_adjacency = adjacency / adjacency.sum(dim=1, keepdim=True)
+    pkg_json = json.dumps(pkg.as_json(), ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+    provenance: dict[str, object] = {
+        "source_partition": Partition.TRAIN.value,
+        "base_action_pool_hash": bundle.source_hashes["pools.base"],
+        "base_action_count": len(base_pool),
+        "source_record_count": pkg.source_record_count,
+        "edge_count": len(pkg.edge_counts),
+        "pkg_sha256": hashlib.sha256(pkg_json.encode("utf-8")).hexdigest(),
+        "node_embedding_sha256": _sha256_tensor(node_embeddings),
+        "normalized_adjacency_sha256": _sha256_tensor(normalized_adjacency),
+    }
+    return AdaptedKEPPGraph(base_pool, node_embeddings, normalized_adjacency, provenance)
 
 
 @dataclass(frozen=True)
