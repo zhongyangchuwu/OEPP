@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 
 import torch
 
 from oepp.models.p3iv_adapted import AdaptedP3IV
 from oepp.models.registry import build_direct_model
-from oepp.training.direct import evaluate_direct
+from oepp.training.direct import _direct_predictions, evaluate_direct, load_config
 
 
 class AdaptedP3IVTests(unittest.TestCase):
@@ -116,6 +117,27 @@ class AdaptedP3IVTests(unittest.TestCase):
             prediction_mode="mean",
         )
         self.assertEqual(mean_first, mean_second)
+
+    def test_direct_runner_selects_mean_prediction_mode(self) -> None:
+        self.model.eval()
+        expected = torch.stack(self.model.predict_mean(self.frames), dim=1)
+        actual = _direct_predictions(self.model, self.frames, prediction_mode="mean")
+
+        self.assertTrue(torch.equal(expected, actual))
+
+    def test_v2_configs_are_versioned_and_valid(self) -> None:
+        expected = {
+            "p3iv-v2-diversity0.yaml": ("p3iv-v2-diversity0", None),
+            "p3iv-v2-mean-diversity0.yaml": ("p3iv-v2-mean-diversity0", "mean"),
+            "p3iv-v2-mean-train.yaml": ("p3iv-v2-mean-train", "mean"),
+            "p3iv-v2-mean-final-split-001.yaml": ("p3iv-v2-mean-final-split-001", "mean"),
+            "p3iv-v2-mean-final-split-002.yaml": ("p3iv-v2-mean-final-split-002", "mean"),
+        }
+        for filename, (experiment_id, training_mode) in expected.items():
+            config = load_config(Path("configs/training") / filename)
+
+            self.assertEqual(config["experiment_id"], experiment_id)
+            self.assertEqual(config["sampling"].get("training_mode"), training_mode)
 
     def test_one_planner_evaluates_different_candidate_pools(self) -> None:
         samples = [

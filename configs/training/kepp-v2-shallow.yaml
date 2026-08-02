@@ -1,0 +1,25 @@
+experiment_id: kepp-v2-shallow
+data:
+  split_id: split-001
+  feature: videoclip
+  horizon: 3
+  padding: left
+sampling:
+  seed: 42
+  validation_mode: deterministic
+  export_mode: deterministic
+training:
+  batch_size: 256
+  epochs: 200
+  lr: 0.0001
+  weight_decay: 0.00001
+  num_workers: 0
+model:
+  family: adapted_kepp
+  hidden_dimension: 768
+  num_heads: 4
+  graph_layers: 1
+  dropout: 0.0
+loss:
+  ce_w: 1.0
+  mse_w: 0.2

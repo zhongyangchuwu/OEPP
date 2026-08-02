@@ -31,6 +31,7 @@ from .selection import is_better_direct_checkpoint
 from .support import (
     action_embedding_tensor,
     canonical_json_hash,
+    load_direct_checkpoint,
     save_direct_checkpoint,
     seed_everything,
     utc_now,
@@ -47,6 +48,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--run-dir", type=Path, default=None)
     parser.add_argument(
         "--epochs", type=int, default=None, help="Override training.epochs for calibration."
+    )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume a direct run from last.pt without resetting its validation-selected best.pt.",
     )
     parser.add_argument("--eval-batch-size", type=int, default=None)
     parser.add_argument("--device", default="cuda")
@@ -86,7 +92,7 @@ def load_config(path: Path) -> dict[str, Any]:
     for name in ("validation_seed", "export_seed"):
         if name in sampling and not isinstance(sampling[name], int):
             raise ValueError(f"sampling.{name} must be an integer when provided")
-    for name in ("validation_mode", "export_mode"):
+    for name in ("training_mode", "validation_mode", "export_mode"):
         if name in sampling and sampling[name] not in {"sample", "mean", "deterministic"}:
             raise ValueError(
                 f"sampling.{name} must be 'sample', 'mean', or 'deterministic' when provided"
@@ -105,6 +111,9 @@ def load_config(path: Path) -> dict[str, Any]:
     diversity_weight = float(loss.get("diversity_w", 0.0))
     if diversity_weight < 0.0:
         raise ValueError("loss.diversity_w must be non-negative")
+    experiment_id = config.get("experiment_id")
+    if experiment_id is not None and (not isinstance(experiment_id, str) or not experiment_id):
+        raise ValueError("experiment_id must be a non-empty string when provided")
     return config
 
 
@@ -227,12 +236,53 @@ def _seed_worker(worker_id: int) -> None:
     np.random.seed(seed)
 
 
+
+def _restore_direct_training_state(
+    *,
+    run_dir: Path,
+    model: torch.nn.Module,
+    optimizer: torch.optim.Optimizer,
+    config: Mapping[str, Any],
+    device: torch.device,
+    kepp_graph_provenance: Mapping[str, object] | None,
+) -> tuple[int, dict[str, float], int, dict[str, Any]]:
+    """Restore a compatible run and preserve the prior validation-selected checkpoint."""
+    last_checkpoint = load_direct_checkpoint(run_dir / "last.pt", device)
+    expected_config_hash = canonical_json_hash(config)
+    last_config_hash = canonical_json_hash(
+        _mapping(last_checkpoint["config"], "checkpoint.config")
+    )
+    if last_config_hash != expected_config_hash:
+        raise ValueError("--resume config does not match last.pt")
+    checkpoint_graph = _mapping(last_checkpoint["provenance"], "checkpoint.provenance").get(
+        "adapted_kepp_graph"
+    )
+    if checkpoint_graph != kepp_graph_provenance:
+        raise ValueError("--resume KEPP graph provenance does not match last.pt")
+    model.load_state_dict(last_checkpoint["model_state"])
+    optimizer.load_state_dict(last_checkpoint["optimizer_state"])
+    best_checkpoint = load_direct_checkpoint(run_dir / "best.pt", device)
+    best_config_hash = canonical_json_hash(_mapping(best_checkpoint["config"], "best.config"))
+    if best_config_hash != expected_config_hash:
+        raise ValueError("--resume config does not match best.pt")
+    if _mapping(best_checkpoint["provenance"], "best.provenance").get(
+        "adapted_kepp_graph"
+    ) != kepp_graph_provenance:
+        raise ValueError("--resume KEPP graph provenance does not match best.pt")
+    return (
+        int(last_checkpoint["epoch"]),
+        dict(best_checkpoint["validation_metrics"]),
+        int(best_checkpoint["epoch"]),
+        dict(_mapping(last_checkpoint["provenance"], "checkpoint.provenance")),
+    )
+
 def main() -> None:
     arguments = parse_args()
     config = load_config(arguments.config)
     training = _mapping(config["training"], "training")
     data = _mapping(config["data"], "data")
     sampling = _mapping(config["sampling"], "sampling")
+    training_prediction_mode = str(sampling.get("training_mode", "sample"))
     validation_prediction_mode = str(sampling.get("validation_mode", "sample"))
     if arguments.epochs is not None:
         if arguments.epochs <= 0:
@@ -243,7 +293,11 @@ def main() -> None:
         raise RuntimeError("CUDA is required for OEPP feature training but is unavailable")
 
     run_dir = _run_dir(arguments, config)
-    run_dir.mkdir(parents=True, exist_ok=False)
+    if arguments.resume:
+        if not run_dir.is_dir():
+            raise FileNotFoundError(f"--resume run directory does not exist: {run_dir}")
+    else:
+        run_dir.mkdir(parents=True, exist_ok=False)
     seed = int(sampling["seed"])
     seed_everything(seed)
     bundle = SplitBundle.load(arguments.data_root, str(data["split_id"]))
@@ -325,6 +379,8 @@ def main() -> None:
         "torch_version": str(torch.__version__),
         "fresh_initialization": True,
         "sampling_seed": seed,
+        "experiment_id": config.get("experiment_id"),
+        "training_prediction_mode": training_prediction_mode,
         "validation_sampling_seed": sampling.get("validation_seed"),
         "validation_prediction_mode": validation_prediction_mode,
         "legacy_loss_semantics": (
@@ -334,13 +390,36 @@ def main() -> None:
     }
     if kepp_graph_provenance is not None:
         provenance["adapted_kepp_graph"] = kepp_graph_provenance
-    write_json(run_dir / "run_metadata.json", provenance)
-    (run_dir / "config.yaml").write_text(yaml.safe_dump(config, sort_keys=True), encoding="utf-8")
-
-    best_metrics: dict[str, float] | None = None
-    best_epoch: int | None = None
+    if arguments.resume:
+        start_epoch, best_metrics, best_epoch, provenance = _restore_direct_training_state(
+            run_dir=run_dir,
+            model=model,
+            optimizer=optimizer,
+            config=config,
+            device=device,
+            kepp_graph_provenance=kepp_graph_provenance,
+        )
+        if start_epoch >= int(training["epochs"]):
+            raise ValueError("--resume last.pt has already reached the configured epoch budget")
+        write_json(
+            run_dir / "resume.json",
+            {
+                "resumed_at": utc_now(),
+                "resumed_from_epoch": start_epoch,
+                "prior_best_epoch": best_epoch,
+                "config_hash": canonical_json_hash(config),
+            },
+        )
+    else:
+        write_json(run_dir / "run_metadata.json", provenance)
+        (run_dir / "config.yaml").write_text(
+            yaml.safe_dump(config, sort_keys=True), encoding="utf-8"
+        )
+        start_epoch = 0
+        best_metrics = None
+        best_epoch = None
     metrics_path = run_dir / "training_metrics.jsonl"
-    for epoch in range(1, int(training["epochs"]) + 1):
+    for epoch in range(start_epoch + 1, int(training["epochs"]) + 1):
         model.train()
         total_loss = 0.0
         total_train_steps = 0
@@ -348,7 +427,9 @@ def main() -> None:
             frames = batch[3].to(device, non_blocking=True).float()
             ground = batch[5].to(device, non_blocking=True).float()
             labels = batch[7].to(device, non_blocking=True).long()
-            predicted = _direct_predictions(model, frames)
+            predicted = _direct_predictions(
+                model, frames, prediction_mode=training_prediction_mode
+            )
             _require_prediction_shape(predicted, ground)
             ce_total = torch.zeros((), device=device)
             mse_total = torch.zeros((), device=device)

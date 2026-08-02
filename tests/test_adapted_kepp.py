@@ -152,6 +152,21 @@ class AdaptedKEPPTests(unittest.TestCase):
             self.assertEqual(config["sampling"]["validation_mode"], "deterministic")
             self.assertEqual(config["sampling"]["export_mode"], "deterministic")
 
+    def test_v2_configs_are_versioned_and_valid(self) -> None:
+        expected = {
+            "kepp-v2-wide.yaml": (1536, 8, 2),
+            "kepp-v2-shallow.yaml": (768, 4, 1),
+            "kepp-v2-wide-final-split-001.yaml": (1536, 8, 2),
+            "kepp-v2-wide-final-split-002.yaml": (1536, 8, 2),
+        }
+        for filename, (hidden_dimension, num_heads, graph_layers) in expected.items():
+            config = load_config(Path("configs/training") / filename)
+
+            self.assertEqual(config["experiment_id"], filename.removesuffix(".yaml"))
+            self.assertEqual(config["model"]["hidden_dimension"], hidden_dimension)
+            self.assertEqual(config["model"]["num_heads"], num_heads)
+            self.assertEqual(config["model"]["graph_layers"], graph_layers)
+
 
 if __name__ == "__main__":
     unittest.main()
