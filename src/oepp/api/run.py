@@ -34,6 +34,16 @@ IMAGE_DETAILS = frozenset({"auto", "low", "high"})
 
 RESERVED_PROVIDER_EXTRA_BODY_FIELDS = frozenset({"model", "messages", "temperature", "max_tokens"})
 
+TERMINAL_RESPONSE_STATUSES = frozenset({"success", "api_failure", "external_interruption"})
+
+
+def _terminal_response_ids(responses_path: Path) -> set[str]:
+    return {
+        record["sample_id"]
+        for record in load_jsonl(responses_path)
+        if record.get("status") in TERMINAL_RESPONSE_STATUSES
+    }
+
 
 def _mapping(value: Any, name: str) -> dict[str, Any]:
     if not isinstance(value, dict):
@@ -380,11 +390,7 @@ def run(
     predictions_path = run_dir / "predictions.jsonl"
     failures_path = run_dir / "failures.jsonl"
     ledger_path = API_RUNS_ROOT / "api_call_ledger.jsonl"
-    completed_ids = {
-        record["sample_id"]
-        for record in load_jsonl(responses_path)
-        if record.get("status") == "success"
-    }
+    completed_ids = _terminal_response_ids(responses_path)
     saved_request_ids = {record["sample_id"] for record in load_jsonl(requests_path)}
     call_count = sum(1 for record in load_jsonl(ledger_path) if record.get("run_name") == run_name)
     attempted_samples = 0

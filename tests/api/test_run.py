@@ -117,6 +117,30 @@ class RunBudgetTests(unittest.TestCase):
             self.assertEqual(requests[0]["model"], "google/gemini-3.1-flash-lite")
 
 
+class ResumeTests(unittest.TestCase):
+    def test_terminal_response_statuses_are_not_reissued(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            responses_path = Path(directory) / "responses.jsonl"
+            responses_path.write_text(
+                "\n".join(
+                    json.dumps({"sample_id": sample_id, "status": status})
+                    for sample_id, status in (
+                        ("successful", "success"),
+                        ("provider-failure", "api_failure"),
+                        ("interrupted", "external_interruption"),
+                        ("unknown", "pending"),
+                    )
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                run_api._terminal_response_ids(responses_path),
+                {"successful", "provider-failure", "interrupted"},
+            )
+
+
 class ProviderExtraBodyTests(unittest.TestCase):
     def test_rejects_standard_request_field_override(self) -> None:
         with self.assertRaisesRegex(ValueError, "cannot override: max_tokens"):
