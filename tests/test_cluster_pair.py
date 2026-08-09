@@ -5,6 +5,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from oepp.data import ActionPool, Partition, SplitBundle
 from oepp.data.cluster_pair import (
@@ -14,7 +15,7 @@ from oepp.data.cluster_pair import (
     cluster_folds,
 )
 from oepp.evaluation.cluster_pair import summarize_cluster_pair
-from oepp.experiments.cluster_pair import build_tasks
+from oepp.experiments.cluster_pair import RunTask, _execute_task, build_tasks
 
 
 class ClusterPairSplitTests(unittest.TestCase):
@@ -175,6 +176,56 @@ class ClusterPairSummaryTests(unittest.TestCase):
                 config = task.config_path.read_text(encoding="utf-8")
                 self.assertIn("epochs: 3", config)
                 self.assertIn(f"split_id: {task.split_id}", config)
+
+    def test_runner_does_not_create_run_directory_for_training_log(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            config_path = root / "config.yaml"
+            config_path.write_text("model: {}\n", encoding="utf-8")
+            task = RunTask(
+                model="mlp",
+                fold_index=0,
+                condition="supported",
+                split_id="supported",
+                config_path=config_path,
+                run_dir=root / "runs" / "mlp" / "fold-00" / "supported",
+            )
+            calls = []
+
+            def fake_run(command: list[str], *, env: dict[str, str], log_path: Path) -> None:
+                del env
+                calls.append(command)
+                self.assertEqual(log_path.parent, task.run_dir.parent)
+                self.assertNotEqual(log_path.parent, task.run_dir)
+                if "train" in command:
+                    self.assertFalse(task.run_dir.exists())
+                    task.run_dir.mkdir(parents=True)
+                    (task.run_dir / "selection.json").write_text("{}", encoding="utf-8")
+                    (task.run_dir / "best.pt").write_bytes(b"checkpoint")
+                elif "export" in command:
+                    export_dir = task.run_dir / "exports"
+                    export_dir.mkdir()
+                    for name in (
+                        "run_metadata.json",
+                        "base_metrics_per_window_step.csv",
+                        "novel_metrics_per_window_step.csv",
+                    ):
+                        (export_dir / name).write_text("artifact", encoding="utf-8")
+                else:
+                    (task.run_dir / "planning_metrics.json").write_text(
+                        "{}", encoding="utf-8"
+                    )
+
+            with patch("oepp.experiments.cluster_pair._run_command", side_effect=fake_run):
+                result = _execute_task(
+                    task,
+                    device="0",
+                    data_root=root,
+                    videoclip_root=root,
+                    eval_batch_size=2,
+                )
+            self.assertEqual(result["status"], "passed")
+            self.assertEqual(len(calls), 3)
 
 
 if __name__ == "__main__":

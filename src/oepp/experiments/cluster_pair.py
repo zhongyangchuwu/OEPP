@@ -158,7 +158,7 @@ def _execute_task(
     env = dict(os.environ)
     env["CUDA_VISIBLE_DEVICES"] = device
     env["OEPP_VIDEOCLIP_ROOT"] = str(videoclip_root)
-    log_path = task.run_dir / "cluster_pair_run.log"
+    log_path = task.run_dir.with_suffix(".log")
     started_at = utc_now()
     try:
         if metrics_path.exists() and not all(path.is_file() for path in required):
@@ -247,6 +247,7 @@ def _execute_task(
             "config_hash": canonical_json_hash(_load_yaml(task.config_path)),
             "run_dir": str(task.run_dir),
             "metrics": str(metrics_path),
+            "log": str(log_path),
         }
     except BaseException as error:
         result = {
@@ -262,6 +263,7 @@ def _execute_task(
             "status": "failed",
             "error": f"{type(error).__name__}: {error}",
             "run_dir": str(task.run_dir),
+            "log": str(log_path),
         }
     task.run_dir.mkdir(parents=True, exist_ok=True)
     write_json(status_path, result)
