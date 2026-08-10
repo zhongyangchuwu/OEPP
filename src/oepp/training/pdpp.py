@@ -1,3 +1,4 @@
+import json
 import os
 import random
 from collections import OrderedDict
@@ -25,7 +26,7 @@ from oepp.data import (
 from oepp.data.features import default_videoclip_root
 from oepp.legacy.utils.args import get_args
 from oepp.legacy.utils.eval import validate
-from oepp.legacy.utils.training import Trainer
+from oepp.legacy.utils.training import Trainer, validate_pdpp_loss_weights
 from oepp.models.helpers import Logger, get_lr_schedule_with_warmup
 
 from .pdpp_runtime import (
@@ -37,6 +38,55 @@ from .pdpp_runtime import (
 )
 from .selection import is_better_pdpp_checkpoint
 from .support import write_json
+
+PDPP_VALIDATION_HISTORY_FORMAT = "oepp-pdpp-validation-history-v1"
+PDPP_SELECTION_FORMAT = "oepp-pdpp-selection-v1"
+PDPP_SELECTION_RULE = ["max_validation_sr", "max_validation_acc", "earlier_epoch"]
+
+
+def load_pdpp_validation_history(path: str | Path, checkpoint_epoch: int) -> list[dict]:
+    source = Path(path)
+    if not source.exists():
+        return []
+    payload = json.loads(source.read_text(encoding="utf-8"))
+    if payload.get("format") != PDPP_VALIDATION_HISTORY_FORMAT:
+        raise ValueError(f"Unsupported PDPP validation history format in {source}")
+    history = list(payload.get("epochs", []))
+    recorded_epochs = [int(record["epoch"]) for record in history]
+    if recorded_epochs != sorted(set(recorded_epochs)):
+        raise ValueError(f"PDPP validation history epochs are not unique and ordered in {source}")
+    if recorded_epochs and recorded_epochs[-1] > checkpoint_epoch:
+        raise ValueError(f"PDPP validation history is ahead of checkpoint epoch {checkpoint_epoch}")
+    return history
+
+
+def write_pdpp_training_records(
+    checkpoint_dir: str | Path,
+    history: list[dict],
+    best_epoch: int | None,
+    best_metrics: dict[str, float] | None,
+) -> None:
+    directory = Path(checkpoint_dir)
+    write_json(
+        directory / "validation_history.json",
+        {"format": PDPP_VALIDATION_HISTORY_FORMAT, "epochs": history},
+    )
+    write_json(
+        directory / "selection.json",
+        {
+            "format": PDPP_SELECTION_FORMAT,
+            "rule": PDPP_SELECTION_RULE,
+            "selected_epoch": best_epoch,
+            "validation_metrics": best_metrics,
+            "test_sets_used_for_selection": False,
+        },
+    )
+
+
+def reduce_optional_metric(value: float | None) -> float | None:
+    if value is None:
+        return None
+    return reduce_tensor(torch.tensor(value).cuda()).item()
 
 
 def reduce_tensor(tensor):
@@ -60,6 +110,7 @@ def get_text_tensor(action_pool, action_text_dict):
 def main():
     print("Cuda support:", torch.cuda.is_available(), ":", torch.cuda.device_count(), "devices")
     args = get_args()
+    validate_pdpp_loss_weights(float(args.para_ce), float(args.para_mse))
 
     os.environ["PYTHONHASHSEED"] = str(args.seed)
 
@@ -272,10 +323,18 @@ def main_worker(gpu, ngpus_per_node, args):
                 "split_source_hashes": dict(bundle.source_hashes),
                 "feature_roots": {"videoclip": str(roots.videoclip)},
                 "feature": feature.value,
+                "loss_objective": {
+                    "ce_weight": float(args.para_ce),
+                    "mse_weight": float(args.para_mse),
+                    "normalization": "per-step detached scalar magnitude",
+                    "ce_input": "legacy softmax-normalized cosine scores",
+                },
+                "test_sets_used_for_selection": False,
             },
         )
     best_metrics: dict[str, float] | None = None
     best_epoch: int | None = None
+    validation_history: list[dict] = []
     if args.resume:
         checkpoint_path = os.path.join(checkpoint_dir, "last.pt")
         if not os.path.isfile(checkpoint_path):
@@ -292,6 +351,9 @@ def main_worker(gpu, ngpus_per_node, args):
             previous_best = load_pdpp_checkpoint(previous_best_path, torch.device("cpu"))
             best_metrics = dict(previous_best["validation_metrics"])
             best_epoch = int(previous_best["epoch"])
+        validation_history = load_pdpp_validation_history(
+            Path(checkpoint_dir) / "validation_history.json", args.start_epoch
+        )
         if args.rank == 0:
             log(f"=> resumed checkpoint '{checkpoint_path}' at epoch {checkpoint['epoch']}", args)
 
@@ -318,6 +380,11 @@ def main_worker(gpu, ngpus_per_node, args):
             ) = model.train(args.n_train_steps, True, args, scheduler, train_text_tensor)
 
             losses_reduced1 = reduce_tensor(losses1.cuda()).item()
+            train_loss_metrics_reduced = {
+                "objective": losses_reduced1,
+                "ce": reduce_optional_metric(model.last_loss_metrics["ce"]),
+                "mse": reduce_optional_metric(model.last_loss_metrics["mse"]),
+            }
             acc_top1_reduced1 = reduce_tensor(acc_top11.cuda()).item()
             acc_top5_reduced1 = reduce_tensor(acc_top51.cuda()).item()
             trajectory_success_rate_meter_reduced1 = reduce_tensor(
@@ -335,6 +402,10 @@ def main_worker(gpu, ngpus_per_node, args):
                 print("---------------------------------")
                 logs = OrderedDict()
                 logs["Train1/EpochLoss"] = losses_reduced1
+                if train_loss_metrics_reduced["ce"] is not None:
+                    logs["Train1/EpochCE"] = train_loss_metrics_reduced["ce"]
+                if train_loss_metrics_reduced["mse"] is not None:
+                    logs["Train1/EpochMSE"] = train_loss_metrics_reduced["mse"]
                 logs["Train1/EpochAcc@1"] = acc_top1_reduced1
                 logs["Train1/EpochAcc@5"] = acc_top5_reduced1
                 logs["Train1/Traj_Success_Rate"] = trajectory_success_rate_meter_reduced1
@@ -350,6 +421,11 @@ def main_worker(gpu, ngpus_per_node, args):
         else:
             losses1 = model.train(args.n_train_steps, False, args, scheduler, train_text_tensor)
             losses_reduced1 = reduce_tensor(losses1.cuda()).item()
+            train_loss_metrics_reduced = {
+                "objective": losses_reduced1,
+                "ce": reduce_optional_metric(model.last_loss_metrics["ce"]),
+                "mse": reduce_optional_metric(model.last_loss_metrics["mse"]),
+            }
             if args.rank == 0:
                 print("lrs:")
                 for p in model.optimizer.param_groups:
@@ -358,6 +434,10 @@ def main_worker(gpu, ngpus_per_node, args):
 
                 logs = OrderedDict()
                 logs["Train1/EpochLoss"] = losses_reduced1
+                if train_loss_metrics_reduced["ce"] is not None:
+                    logs["Train1/EpochCE"] = train_loss_metrics_reduced["ce"]
+                if train_loss_metrics_reduced["mse"] is not None:
+                    logs["Train1/EpochMSE"] = train_loss_metrics_reduced["mse"]
                 for key, value in logs.items():
                     tb_logger.log_scalar(value, key, epoch + 1)
 
@@ -449,6 +529,19 @@ def main_worker(gpu, ngpus_per_node, args):
             save_pdpp_checkpoint(os.path.join(checkpoint_dir, "last.pt"), payload)
             if validation_metrics and is_best:
                 save_pdpp_checkpoint(os.path.join(checkpoint_dir, "best.pt"), payload)
+            validation_history = [
+                record for record in validation_history if int(record["epoch"]) < epoch + 1
+            ]
+            validation_history.append(
+                {
+                    "epoch": epoch + 1,
+                    "train": train_loss_metrics_reduced,
+                    "validation": validation_metrics,
+                }
+            )
+            write_pdpp_training_records(
+                checkpoint_dir, validation_history, best_epoch, best_metrics
+            )
 
         if ((epoch + 1) % 1 == 0) and args.evaluate and args.test_during_training:
             acc_top1_reduced1 = 0.0

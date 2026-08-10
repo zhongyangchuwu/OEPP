@@ -13,6 +13,62 @@ def cycle(dl):
         yield from dl
 
 
+def validate_pdpp_loss_weights(ce_weight: float, mse_weight: float) -> None:
+    if ce_weight < 0 or mse_weight < 0:
+        raise ValueError("PDPP CE and MSE weights must be non-negative")
+    if ce_weight == 0 and mse_weight == 0:
+        raise ValueError("PDPP requires at least one active CE or MSE loss branch")
+
+
+def pdpp_action_objective(
+    predicted: torch.Tensor,
+    labels: torch.Tensor,
+    train_text_tensor: torch.Tensor,
+    *,
+    ce_weight: float,
+    mse_weight: float,
+) -> tuple[torch.Tensor, dict[str, float | None]]:
+    """Build the legacy normalized PDPP action objective and auditable components."""
+    validate_pdpp_loss_weights(ce_weight, mse_weight)
+    if predicted.ndim != 3 or labels.shape != predicted.shape[:2]:
+        raise ValueError("PDPP predictions and labels must have shapes [B,T,D] and [B,T]")
+
+    batch_size, horizon, _ = predicted.shape
+    objective = predicted.new_zeros(())
+    ce_total = predicted.new_zeros(())
+    mse_total = predicted.new_zeros(())
+    epsilon = torch.finfo(predicted.dtype).eps
+
+    for step in range(horizon):
+        step_prediction = predicted[:, step, :]
+        step_labels = labels[:, step]
+
+        if mse_weight > 0:
+            ground_truth = train_text_tensor[step_labels]
+            step_mse = (
+                torch.nn.functional.mse_loss(step_prediction, ground_truth, reduction="sum")
+                / batch_size
+            )
+            mse_total = mse_total + step_mse
+            objective = objective + mse_weight * step_mse / step_mse.detach().clamp_min(epsilon)
+
+        if ce_weight > 0:
+            similarity = torch.nn.functional.cosine_similarity(
+                step_prediction.unsqueeze(1), train_text_tensor.unsqueeze(0), dim=2
+            )
+            legacy_probabilities = torch.nn.functional.softmax(similarity / 0.1, dim=1)
+            step_ce = torch.nn.functional.cross_entropy(legacy_probabilities, step_labels)
+            ce_total = ce_total + step_ce
+            objective = objective + ce_weight * step_ce / step_ce.detach().clamp_min(epsilon)
+
+    metrics = {
+        "objective": float(objective.detach().item() / horizon),
+        "ce": float(ce_total.detach().item() / horizon) if ce_weight > 0 else None,
+        "mse": float(mse_total.detach().item() / horizon) if mse_weight > 0 else None,
+    }
+    return objective, metrics
+
+
 class EMA:
     """
     empirical moving average
@@ -68,6 +124,11 @@ class Trainer:
 
         self.reset_parameters()
         self.step = 0
+        self.last_loss_metrics: dict[str, float | None] = {
+            "objective": 0.0,
+            "ce": None,
+            "mse": None,
+        }
 
     def reset_parameters(self):
         self.ema_model.load_state_dict(self.model.state_dict())
@@ -83,11 +144,13 @@ class Trainer:
     # -----------------------------------------------------------------------------#
 
     def train(self, n_train_steps, if_calculate_acc, args, scheduler, train_text_tensor):
+        validate_pdpp_loss_weights(float(args.para_ce), float(args.para_mse))
         self.model.train()
         self.ema_model.train()
         losses1 = AverageMeter()
+        ce_losses = AverageMeter()
+        mse_losses = AverageMeter()
         self.optimizer.zero_grad()
-        cost = torch.nn.CrossEntropyLoss()
 
         for step in range(n_train_steps):
             for i in range(self.gradient_accumulate_every):
@@ -132,7 +195,6 @@ class Trainer:
 
                 x1 = img_tensors1.float()
                 x_output = unwrap_model(self.model).loss(x1, cond1)
-                loss = 0
                 x_output = x_output[
                     :,
                     :,
@@ -140,27 +202,21 @@ class Trainer:
                     + args.class_dim
                     + args.action_dim,
                 ]
-
-                for j in range(T1):
-                    frames_embedding = x_output[:, j, :]
-                    label = labels[:, j]
-                    gt_embedding = train_text_tensor[label]
-                    mse_loss = torch.nn.MSELoss(reduction="sum")
-                    m_loss = mse_loss(frames_embedding, gt_embedding) / bs1
-                    sim_logits = torch.nn.functional.cosine_similarity(
-                        frames_embedding.unsqueeze(1), train_text_tensor.unsqueeze(0), dim=2
-                    )  # 256 666
-                    sim_logits = sim_logits / 0.1
-                    sim_logits_softmax = torch.nn.functional.softmax(sim_logits, dim=1)
-                    loss_ce = cost(sim_logits_softmax, label)
-                    loss += (
-                        m_loss / m_loss.item() * args.para_mse
-                        + loss_ce / loss_ce.item() * args.para_ce
-                    )
+                loss, loss_metrics = pdpp_action_objective(
+                    x_output,
+                    labels,
+                    train_text_tensor,
+                    ce_weight=float(args.para_ce),
+                    mse_weight=float(args.para_mse),
+                )
 
                 loss = loss / self.gradient_accumulate_every
                 loss.backward()
-                losses1.update(m_loss.item() + loss_ce.item(), bs1)
+                losses1.update(loss_metrics["objective"], bs1)
+                if loss_metrics["ce"] is not None:
+                    ce_losses.update(loss_metrics["ce"], bs1)
+                if loss_metrics["mse"] is not None:
+                    mse_losses.update(loss_metrics["mse"], bs1)
                 self.optimizer.step()
                 self.optimizer.zero_grad()
 
@@ -169,6 +225,12 @@ class Trainer:
             if self.step % self.update_ema_every == 0:
                 self.step_ema()
             self.step += 1
+
+        self.last_loss_metrics = {
+            "objective": float(losses1.avg),
+            "ce": float(ce_losses.avg) if ce_losses.count else None,
+            "mse": float(mse_losses.avg) if mse_losses.count else None,
+        }
 
         if if_calculate_acc:
             with torch.no_grad():
