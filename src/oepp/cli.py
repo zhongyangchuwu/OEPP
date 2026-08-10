@@ -16,6 +16,7 @@ COMMAND_MODULES = {
     "train-pdpp": "oepp.training.pdpp",
     "export": "oepp.exports.direct",
     "export-pdpp": "oepp.exports.pdpp",
+    "evaluate-simple-baselines": "oepp.exports.simple",
     "kepp-preflight": "oepp.baselines.kepp",
     "p3iv-preflight": "oepp.baselines.p3iv",
     "import-alternate-split": "oepp.data.alternate_split",
