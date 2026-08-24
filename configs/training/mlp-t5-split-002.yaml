@@ -1,0 +1,19 @@
+experiment_id: oepp-split-002-long-horizon-baselines-v1/mlp/t5/split-002
+data:
+  split_id: split-002
+  feature: videoclip
+  horizon: 5
+  padding: left
+sampling:
+  seed: 42
+training:
+  batch_size: 256
+  epochs: 200
+  lr: 0.0001
+  weight_decay: 0.00001
+  num_workers: 0
+model:
+  family: mlp
+loss:
+  ce_w: 1.0
+  mse_w: 0.2
